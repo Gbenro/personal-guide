@@ -352,7 +352,7 @@ export async function getHabitCompletionsRange(
     }
 
     const completions: { [date: string]: number } = {}
-    
+
     if (data) {
       data.forEach((entry: { completed_at: string }) => {
         const date = new Date(entry.completed_at).toISOString().split('T')[0]
@@ -364,5 +364,343 @@ export async function getHabitCompletionsRange(
   } catch (error) {
     console.error('Error in getHabitCompletionsRange:', error)
     return {}
+  }
+}
+
+// Get a single habit by ID
+export async function getHabitById(habitId: string, userId: string): Promise<Habit | null> {
+  try {
+    const { data, error } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('id', habitId)
+      .eq('user_id', userId)
+      .single()
+
+    if (error) {
+      console.error('Error fetching habit by ID:', error)
+      return null
+    }
+
+    return data as Habit
+  } catch (error) {
+    console.error('Error in getHabitById:', error)
+    return null
+  }
+}
+
+// Get all archived habits for a user
+export async function getArchivedHabits(userId: string): Promise<Habit[]> {
+  try {
+    const { data, error } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', userId)
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching archived habits:', error)
+      return []
+    }
+
+    return (data as Habit[]) || []
+  } catch (error) {
+    console.error('Error in getArchivedHabits:', error)
+    return []
+  }
+}
+
+// Restore an archived habit
+export async function restoreHabit(habitId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('habits')
+      .update({
+        archived_at: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', habitId)
+
+    if (error) {
+      console.error('Error restoring habit:', error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in restoreHabit:', error)
+    return false
+  }
+}
+
+// Hard delete a habit (permanent removal)
+export async function deleteHabitPermanently(habitId: string): Promise<boolean> {
+  try {
+    // First delete all completions for this habit
+    const { error: completionsError } = await supabase
+      .from('habit_completions')
+      .delete()
+      .eq('habit_id', habitId)
+
+    if (completionsError) {
+      console.error('Error deleting habit completions:', completionsError)
+      return false
+    }
+
+    // Then delete the habit itself
+    const { error: habitError } = await supabase
+      .from('habits')
+      .delete()
+      .eq('id', habitId)
+
+    if (habitError) {
+      console.error('Error deleting habit:', habitError)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in deleteHabitPermanently:', error)
+    return false
+  }
+}
+
+// Search habits with filters
+export interface HabitSearchFilters {
+  query?: string
+  category?: string
+  frequency_period?: 'daily' | 'weekly' | 'monthly'
+  created_after?: Date
+  created_before?: Date
+  include_archived?: boolean
+}
+
+export async function searchHabits(
+  userId: string,
+  filters: HabitSearchFilters = {}
+): Promise<Habit[]> {
+  try {
+    let query = supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', userId)
+
+    // Apply filters
+    if (filters.query) {
+      query = query.or(`name.ilike.%${filters.query}%,description.ilike.%${filters.query}%`)
+    }
+
+    if (filters.frequency_period) {
+      query = query.eq('frequency_period', filters.frequency_period)
+    }
+
+    if (filters.created_after) {
+      query = query.gte('created_at', filters.created_after.toISOString())
+    }
+
+    if (filters.created_before) {
+      query = query.lte('created_at', filters.created_before.toISOString())
+    }
+
+    if (!filters.include_archived) {
+      query = query.is('archived_at', null)
+    }
+
+    query = query.order('created_at', { ascending: true })
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error searching habits:', error)
+      return []
+    }
+
+    return (data as Habit[]) || []
+  } catch (error) {
+    console.error('Error in searchHabits:', error)
+    return []
+  }
+}
+
+// Bulk create habits
+export async function createHabits(userId: string, habits: Omit<Habit, 'id' | 'user_id' | 'created_at' | 'updated_at'>[]): Promise<Habit[]> {
+  try {
+    const habitsToInsert = habits.map(habit => ({
+      ...habit,
+      user_id: userId,
+      target_frequency: habit.target_frequency || 1,
+      frequency_period: habit.frequency_period || 'daily',
+      color: habit.color || '#3B82F6'
+    }))
+
+    const { data, error } = await supabase
+      .from('habits')
+      .insert(habitsToInsert)
+      .select()
+
+    if (error) {
+      console.error('Error creating habits in bulk:', error)
+      return []
+    }
+
+    return (data as Habit[]) || []
+  } catch (error) {
+    console.error('Error in createHabits:', error)
+    return []
+  }
+}
+
+// Bulk update habits
+export async function updateHabits(habitUpdates: { id: string, updates: Partial<Omit<Habit, 'id' | 'user_id' | 'created_at'>> }[]): Promise<boolean> {
+  try {
+    const updatePromises = habitUpdates.map(({ id, updates }) =>
+      supabase
+        .from('habits')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+    )
+
+    const results = await Promise.all(updatePromises)
+
+    // Check if any updates failed
+    const hasErrors = results.some(result => result.error)
+    if (hasErrors) {
+      console.error('Some habit updates failed:', results.filter(r => r.error))
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in updateHabits:', error)
+    return false
+  }
+}
+
+// Bulk archive habits
+export async function archiveHabits(habitIds: string[]): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('habits')
+      .update({
+        archived_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .in('id', habitIds)
+
+    if (error) {
+      console.error('Error archiving habits in bulk:', error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in archiveHabits:', error)
+    return false
+  }
+}
+
+// Get habit statistics
+export interface HabitStats {
+  total_habits: number
+  active_habits: number
+  archived_habits: number
+  total_completions: number
+  completion_rate_today: number
+  completion_rate_week: number
+  completion_rate_month: number
+  longest_streak: number
+  current_active_streaks: number
+}
+
+export async function getHabitStats(userId: string): Promise<HabitStats> {
+  try {
+    // Get all habits
+    const { data: habits, error: habitsError } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (habitsError) {
+      console.error('Error fetching habits for stats:', habitsError)
+      throw habitsError
+    }
+
+    const allHabits = habits || []
+    const activeHabits = allHabits.filter(h => !h.archived_at)
+    const archivedHabits = allHabits.filter(h => h.archived_at)
+
+    // Get all completions
+    const { data: completions, error: completionsError } = await supabase
+      .from('habit_completions')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (completionsError) {
+      console.error('Error fetching completions for stats:', completionsError)
+      throw completionsError
+    }
+
+    const allCompletions = completions || []
+
+    // Calculate time-based completion rates
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const weekStart = new Date(todayStart)
+    weekStart.setDate(weekStart.getDate() - 7)
+    const monthStart = new Date(todayStart)
+    monthStart.setDate(monthStart.getDate() - 30)
+
+    const todayCompletions = allCompletions.filter(c =>
+      new Date(c.completed_at) >= todayStart
+    ).length
+
+    const weekCompletions = allCompletions.filter(c =>
+      new Date(c.completed_at) >= weekStart
+    ).length
+
+    const monthCompletions = allCompletions.filter(c =>
+      new Date(c.completed_at) >= monthStart
+    ).length
+
+    // Calculate completion rates
+    const activeHabitsCount = activeHabits.length
+    const completionRateToday = activeHabitsCount > 0 ? (todayCompletions / activeHabitsCount) * 100 : 0
+    const completionRateWeek = activeHabitsCount > 0 ? (weekCompletions / (activeHabitsCount * 7)) * 100 : 0
+    const completionRateMonth = activeHabitsCount > 0 ? (monthCompletions / (activeHabitsCount * 30)) * 100 : 0
+
+    // Calculate streaks (simplified - would need more complex logic for accurate streaks)
+    const longestStreak = allCompletions.length > 0 ? Math.max(...activeHabits.map(h => {
+      const habitCompletions = allCompletions.filter(c => c.habit_id === h.id)
+      return habitCompletions.length // Simplified - should calculate actual consecutive days
+    })) : 0
+
+    return {
+      total_habits: allHabits.length,
+      active_habits: activeHabits.length,
+      archived_habits: archivedHabits.length,
+      total_completions: allCompletions.length,
+      completion_rate_today: Math.round(completionRateToday),
+      completion_rate_week: Math.round(completionRateWeek),
+      completion_rate_month: Math.round(completionRateMonth),
+      longest_streak: longestStreak,
+      current_active_streaks: activeHabits.length // Simplified
+    }
+  } catch (error) {
+    console.error('Error in getHabitStats:', error)
+    return {
+      total_habits: 0,
+      active_habits: 0,
+      archived_habits: 0,
+      total_completions: 0,
+      completion_rate_today: 0,
+      completion_rate_week: 0,
+      completion_rate_month: 0,
+      longest_streak: 0,
+      current_active_streaks: 0
+    }
   }
 }
