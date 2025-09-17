@@ -175,6 +175,43 @@ export async function completeHabit(
   }
 }
 
+// Undo a habit completion (remove today's completion)
+export async function undoHabitCompletion(
+  habitId: string,
+  userId: string
+): Promise<boolean> {
+  try {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const { error } = await supabase
+      .from('habit_completions')
+      .delete()
+      .eq('habit_id', habitId)
+      .eq('user_id', userId)
+      .gte('completed_at', today.toISOString())
+      .lt('completed_at', tomorrow.toISOString())
+
+    if (error) {
+      console.error('Error undoing habit completion:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in undoHabitCompletion:', error)
+    return false
+  }
+}
+
 // Get today's completions for all habits
 export async function getTodayCompletions(userId: string): Promise<HabitEntry[]> {
   try {

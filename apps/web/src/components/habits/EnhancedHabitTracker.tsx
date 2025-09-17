@@ -30,6 +30,7 @@ import {
   getUserHabits,
   createHabit,
   completeHabit,
+  undoHabitCompletion,
   getTodayCompletions,
   calculateStreak,
   archiveHabit,
@@ -298,6 +299,53 @@ export default function EnhancedHabitTracker() {
     }
   }
 
+  // Undo habit completion
+  const handleUndoCompletion = async (habit: HabitWithStatus) => {
+    if (!user || !habit.completedToday) return
+
+    try {
+      const success = await measureAsyncExecutionTime('undoHabitCompletion', () =>
+        undoHabitCompletion(habit.id, user.id)
+      )
+
+      if (success) {
+        // Remove from today's completions
+        setTodayCompletions(todayCompletions.filter(c => c.habit_id !== habit.id))
+
+        // Recalculate streak after undo
+        const updatedStreak = await calculateStreak(habit.id, user.id)
+
+        setHabits(habits.map(h =>
+          h.id === habit.id
+            ? {
+                ...h,
+                completedToday: false,
+                streak: updatedStreak,
+                completionRate: Math.round((updatedStreak.current_streak / Math.max(updatedStreak.total_completions, 1)) * 100)
+              }
+            : h
+        ))
+
+        trackUserAction({
+          action: 'habit_completion_undone',
+          target: habit.id,
+          metadata: {
+            habitName: habit.name,
+            previousStreak: habit.streak.current_streak,
+            newStreak: updatedStreak.current_streak,
+            category: habit.category
+          }
+        })
+      }
+    } catch (error) {
+      reportError({
+        message: 'Failed to undo habit completion',
+        severity: 'medium',
+        context: { habitId: habit.id, userId: user.id }
+      })
+    }
+  }
+
   // Enhanced habit deletion with confirmation
   const handleDeleteHabit = async (habit: HabitWithStatus) => {
     if (!confirm(`Are you sure you want to delete "${habit.name}"? This action cannot be undone.`)) {
@@ -558,33 +606,58 @@ export default function EnhancedHabitTracker() {
 
                   <div className={`flex items-center ${viewMode === 'grid' ? 'flex-col text-center space-y-3' : 'justify-between'}`}>
                     <div className={`flex items-center ${viewMode === 'grid' ? 'flex-col space-y-2' : 'space-x-3'}`}>
-                      <button
-                        onClick={() => handleToggleCompletion(habit)}
-                        className="transition-transform hover:scale-110 relative"
-                        disabled={habit.completedToday}
-                      >
-                        {habit.completedToday ? (
-                          <CheckCircleSolidIcon
-                            className="h-12 w-12"
-                            style={{ color: habit.color }}
-                          />
-                        ) : (
-                          <CheckCircleIcon
-                            className="h-12 w-12 text-gray-400 hover:text-gray-600"
-                            style={{
-                              borderColor: habit.color,
-                              borderWidth: '2px'
-                            }}
-                          />
-                        )}
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleToggleCompletion(habit)}
+                          className="transition-transform hover:scale-110 relative"
+                          disabled={habit.completedToday}
+                        >
+                          {habit.completedToday ? (
+                            <CheckCircleSolidIcon
+                              className="h-12 w-12"
+                              style={{ color: habit.color }}
+                            />
+                          ) : (
+                            <CheckCircleIcon
+                              className="h-12 w-12 text-gray-400 hover:text-gray-600"
+                              style={{
+                                borderColor: habit.color,
+                                borderWidth: '2px'
+                              }}
+                            />
+                          )}
 
-                        {/* Completion animation overlay */}
+                          {/* Completion animation overlay */}
+                          {habit.completedToday && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-4 h-4 bg-white rounded-full animate-ping"></div>
+                            </div>
+                          )}
+                        </button>
+
+                        {/* Undo button - only show when completed */}
                         {habit.completedToday && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-4 h-4 bg-white rounded-full animate-ping"></div>
-                          </div>
+                          <button
+                            onClick={() => handleUndoCompletion(habit)}
+                            className="p-1 text-gray-400 hover:text-orange-500 transition-colors rounded-full hover:bg-orange-50"
+                            title="Undo completion"
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                              />
+                            </svg>
+                          </button>
                         )}
-                      </button>
+                      </div>
 
                       <div className={viewMode === 'grid' ? 'text-center' : ''}>
                         <div className="flex items-center space-x-2 mb-1">
