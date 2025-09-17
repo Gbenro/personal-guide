@@ -11,7 +11,7 @@ WORKDIR /app
 COPY apps/web/package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copy app source
 COPY apps/web/ ./
