@@ -639,11 +639,11 @@ export default function EnhancedHabitTracker() {
                         {habit.completedToday && (
                           <button
                             onClick={() => handleUndoCompletion(habit)}
-                            className="p-1 text-gray-400 hover:text-orange-500 transition-colors rounded-full hover:bg-orange-50"
+                            className="flex items-center space-x-1 px-2 py-1 text-sm text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors font-medium"
                             title="Undo completion"
                           >
                             <svg
-                              className="w-5 h-5"
+                              className="w-4 h-4"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -655,6 +655,7 @@ export default function EnhancedHabitTracker() {
                                 d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
                               />
                             </svg>
+                            <span>Undo</span>
                           </button>
                         )}
                       </div>
