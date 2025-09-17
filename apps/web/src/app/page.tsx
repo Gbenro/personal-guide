@@ -16,6 +16,7 @@ import GoalsTab from '@/components/tabs/GoalsTab'
 import SpiritualTab from '@/components/tabs/SpiritualTab'
 import JournalTab from '@/components/tabs/JournalTab'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { QueryProvider } from '@/providers/QueryProvider'
 
 function HomePage() {
   const { user, loading, signOut } = useAuth()
@@ -110,8 +111,10 @@ function HomePage() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <HomePage />
-    </AuthProvider>
+    <QueryProvider>
+      <AuthProvider>
+        <HomePage />
+      </AuthProvider>
+    </QueryProvider>
   )
 }
