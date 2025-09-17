@@ -1,9 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Helper to check if Supabase is properly configured
+export const isSupabaseConfigured = () => {
+  return supabaseUrl !== 'https://placeholder.supabase.co' &&
+         supabaseAnonKey !== 'placeholder_key'
+}
 
 // Database Types
 export interface User {
