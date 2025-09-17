@@ -1,0 +1,56 @@
+# Prometheus configuration for Personal Guide monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alert_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Personal Guide Application
+  - job_name: 'personal-guide'
+    static_configs:
+      - targets: ['localhost:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 10s
+
+  # Node Exporter (system metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  # Docker containers (if using Docker)
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['localhost:9323']
+
+  # Supabase metrics (if available)
+  - job_name: 'supabase'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: '/metrics'
+
+# Remote write configuration for Grafana Cloud (free tier)
+remote_write:
+  - url: 'https://prometheus-us-central1.grafana.net/api/prom/push'
+    basic_auth:
+      username: '${GRAFANA_CLOUD_USER}'
+      password: '${GRAFANA_CLOUD_API_KEY}'
+    write_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'personal_guide_.*'
+        action: keep

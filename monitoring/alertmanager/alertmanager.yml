@@ -1,0 +1,107 @@
+# Alertmanager configuration for Personal Guide
+global:
+  smtp_smarthost: ${SMTP_HOST}:${SMTP_PORT}
+  smtp_from: ${ALERT_EMAIL_FROM}
+  smtp_auth_username: ${SMTP_USERNAME}
+  smtp_auth_password: ${SMTP_PASSWORD}
+
+# Inhibit rules - prevent duplicate alerts
+inhibit_rules:
+  - source_matchers:
+      - severity = 'critical'
+    target_matchers:
+      - severity = 'warning'
+    equal: ['instance']
+
+# Routing configuration
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default'
+  routes:
+    # Critical alerts go to multiple channels
+    - matchers:
+        - severity = 'critical'
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 30m
+
+    # Warning alerts go to standard channel
+    - matchers:
+        - severity = 'warning'
+      receiver: 'warning-alerts'
+      repeat_interval: 2h
+
+# Receivers configuration
+receivers:
+  # Default receiver
+  - name: 'default'
+    email_configs:
+      - to: '${ALERT_EMAIL_TO}'
+        subject: '[Personal Guide] Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+
+  # Critical alerts
+  - name: 'critical-alerts'
+    email_configs:
+      - to: '${ALERT_EMAIL_TO}'
+        subject: '🚨 [CRITICAL] Personal Guide Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          CRITICAL ALERT for Personal Guide
+
+          {{ range .Alerts }}
+          🚨 {{ .Annotations.summary }}
+
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+
+          {{ end }}
+
+          Please investigate immediately!
+
+    # Slack webhook for critical alerts
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts'
+        title: '🚨 Critical Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+
+          {{ .Annotations.description }}
+
+          Severity: `{{ .Labels.severity }}`
+          Instance: `{{ .Labels.instance }}`
+          {{ end }}
+
+  # Warning alerts
+  - name: 'warning-alerts'
+    email_configs:
+      - to: '${ALERT_EMAIL_TO}'
+        subject: '⚠️ [WARNING] Personal Guide Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          WARNING ALERT for Personal Guide
+
+          {{ range .Alerts }}
+          ⚠️ {{ .Annotations.summary }}
+
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+
+# Templates for custom formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

@@ -1,0 +1,24 @@
+# Docker Compose override for Staging environment
+version: '3.8'
+
+services:
+  web:
+    image: personal-guide:latest
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_APP_ENV=staging
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.personal-guide-staging.rule=Host(`staging.personalguide.app`)"
+      - "traefik.http.routers.personal-guide-staging.tls=true"
+      - "traefik.http.routers.personal-guide-staging.tls.certresolver=letsencrypt"
+
+  # Monitoring for staging
+  prometheus:
+    environment:
+      - PROMETHEUS_EXTERNAL_URL=https://prometheus-staging.personalguide.app
+
+  grafana:
+    environment:
+      - GF_SERVER_DOMAIN=grafana-staging.personalguide.app
+      - GF_SERVER_ROOT_URL=https://grafana-staging.personalguide.app

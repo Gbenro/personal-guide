@@ -1,0 +1,85 @@
+# Docker Compose override for Production environment
+version: '3.8'
+
+services:
+  web:
+    image: personal-guide:${IMAGE_TAG:-latest}
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_APP_ENV=production
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.personal-guide.rule=Host(`personalguide.app`)"
+      - "traefik.http.routers.personal-guide.tls=true"
+      - "traefik.http.routers.personal-guide.tls.certresolver=letsencrypt"
+      - "traefik.http.services.personal-guide.loadbalancer.healthcheck.path=/api/health"
+      - "traefik.http.services.personal-guide.loadbalancer.healthcheck.interval=30s"
+
+  # Load balancer/reverse proxy
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "letsencrypt:/letsencrypt"
+    restart: unless-stopped
+
+  # Production monitoring
+  prometheus:
+    environment:
+      - PROMETHEUS_EXTERNAL_URL=https://prometheus.personalguide.app
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  grafana:
+    environment:
+      - GF_SERVER_DOMAIN=grafana.personalguide.app
+      - GF_SERVER_ROOT_URL=https://grafana.personalguide.app
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    restart: unless-stopped
+
+volumes:
+  letsencrypt:
+  redis_data:

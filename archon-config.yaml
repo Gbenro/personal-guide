@@ -1,0 +1,16 @@
+archon:
+  api_url: "http://localhost:8181"
+  ui_url: "http://localhost:3737"
+  mcp_url: "http://localhost:8051"
+
+project:
+  name: "personal-guide"
+  type: "ai-powered-application"
+  sync_with_archon: true
+  upload_docs: true
+  
+features:
+  - "AI personal assistance"
+  - "Task management"
+  - "Knowledge organization"
+  - "Personalized recommendations"

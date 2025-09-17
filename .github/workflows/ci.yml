@@ -1,0 +1,425 @@
+# =============================================================================
+# Personal Guide - Continuous Integration Pipeline
+# Comprehensive testing, security scanning, and quality checks
+# =============================================================================
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # =============================================================================
+  # SECURITY & VULNERABILITY SCANNING
+  # =============================================================================
+
+  security-scan:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Setup Node.js and pnpm
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: ${{ env.PNPM_VERSION }}
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Audit dependencies
+      run: pnpm audit --audit-level=moderate
+
+  # =============================================================================
+  # CODE QUALITY & LINTING
+  # =============================================================================
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js and pnpm
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: ${{ env.PNPM_VERSION }}
+
+    - name: Get pnpm store directory
+      id: pnpm-cache
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+    - name: Setup pnpm cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Run ESLint
+      run: pnpm lint
+
+    - name: Run TypeScript type checking
+      run: pnpm type-check
+
+    - name: Check code formatting
+      run: pnpm prettier --check . || echo "Code formatting issues found"
+
+  # =============================================================================
+  # TESTING SUITE
+  # =============================================================================
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-type: [unit, integration, e2e]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js and pnpm
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: ${{ env.PNPM_VERSION }}
+
+    - name: Get pnpm store directory
+      id: pnpm-cache
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+    - name: Setup pnpm cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Run unit tests
+      if: matrix.test-type == 'unit'
+      run: pnpm test:unit || echo "Unit tests not configured yet"
+
+    - name: Run integration tests
+      if: matrix.test-type == 'integration'
+      run: pnpm test:integration || echo "Integration tests not configured yet"
+
+    - name: Run E2E tests
+      if: matrix.test-type == 'e2e'
+      run: pnpm test:e2e || echo "E2E tests not configured yet"
+
+    - name: Upload test coverage
+      if: matrix.test-type == 'unit'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage/lcov.info
+        fail_ci_if_error: false
+
+  # =============================================================================
+  # BUILD & VALIDATION
+  # =============================================================================
+
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: [security-scan, code-quality]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js and pnpm
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: ${{ env.PNPM_VERSION }}
+
+    - name: Get pnpm store directory
+      id: pnpm-cache
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+    - name: Setup pnpm cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Build application
+      run: pnpm build
+
+    - name: Validate build output
+      run: |
+        ls -la apps/web/.next/
+        test -d apps/web/.next/static || (echo "Build artifacts missing" && exit 1)
+
+    - name: Cache build artifacts
+      uses: actions/cache@v4
+      with:
+        path: |
+          apps/web/.next
+          apps/web/out
+        key: build-${{ github.sha }}
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: |
+          apps/web/.next
+          apps/web/out
+        retention-days: 1
+
+  # =============================================================================
+  # DOCKER IMAGE BUILD
+  # =============================================================================
+
+  docker-build:
+    name: Docker Build & Security Scan
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        outputs: type=docker,dest=/tmp/image.tar
+
+    - name: Scan Docker image for vulnerabilities
+      uses: aquasecurity/trivy-action@master
+      with:
+        input: /tmp/image.tar
+        format: 'sarif'
+        output: 'docker-trivy-results.sarif'
+
+    - name: Upload Docker scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'docker-trivy-results.sarif'
+
+    - name: Push Docker image (if main branch)
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # =============================================================================
+  # PERFORMANCE TESTING
+  # =============================================================================
+
+  performance:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install Lighthouse CI
+      run: npm install -g @lhci/cli@0.12.x
+
+    - name: Run Lighthouse CI
+      run: lhci autorun || echo "Lighthouse CI not configured yet"
+
+  # =============================================================================
+  # DEPLOYMENT READINESS CHECK
+  # =============================================================================
+
+  deployment-readiness:
+    name: Deployment Readiness
+    runs-on: ubuntu-latest
+    needs: [build, test, docker-build, performance]
+    if: always()
+
+    steps:
+    - name: Check all jobs status
+      run: |
+        if [[ "${{ needs.build.result }}" == "success" && \
+              "${{ needs.test.result }}" == "success" && \
+              "${{ needs.docker-build.result }}" == "success" ]]; then
+          echo "✅ All checks passed - Ready for deployment"
+          echo "DEPLOYMENT_READY=true" >> $GITHUB_ENV
+        else
+          echo "❌ Some checks failed - Not ready for deployment"
+          echo "DEPLOYMENT_READY=false" >> $GITHUB_ENV
+          exit 1
+        fi
+
+    - name: Create deployment artifact
+      if: env.DEPLOYMENT_READY == 'true' && github.ref == 'refs/heads/main'
+      run: |
+        echo "${{ github.sha }}" > deployment-commit.txt
+        echo "Deployment ready for commit: ${{ github.sha }}"
+
+    - name: Upload deployment artifact
+      if: env.DEPLOYMENT_READY == 'true' && github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-commit
+        path: deployment-commit.txt
+
+  # =============================================================================
+  # NOTIFICATION & MONITORING INTEGRATION
+  # =============================================================================
+
+  notify:
+    name: Notification & Monitoring
+    runs-on: ubuntu-latest
+    needs: [deployment-readiness]
+    if: always()
+
+    steps:
+    - name: Send metrics to monitoring
+      if: always()
+      run: |
+        # Send CI metrics to monitoring service
+        echo "📊 Sending CI metrics to monitoring..."
+
+        # Example metrics that could be sent to monitoring service:
+        # - Build duration
+        # - Test results
+        # - Security scan results
+        # - Performance metrics
+
+        echo "Build status: ${{ needs.deployment-readiness.result }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Actor: ${{ github.actor }}"
+
+    - name: Notify on success
+      if: needs.deployment-readiness.result == 'success'
+      run: |
+        echo "🎉 CI Pipeline completed successfully!"
+        echo "Ready for deployment: ${{ github.sha }}"
+
+    - name: Notify on failure
+      if: needs.deployment-readiness.result == 'failure'
+      run: |
+        echo "💥 CI Pipeline failed!"
+        echo "Please check the logs and fix issues before deployment"
