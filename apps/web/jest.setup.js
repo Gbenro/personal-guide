@@ -149,9 +149,13 @@ jest.mock('@/lib/supabase', () => ({
       single: jest.fn(),
       order: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
+      is: jest.fn().mockReturnThis(),
+      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockReturnThis(),
     })),
   },
-}))
+}), { virtual: true })
 
 // Mock monitoring service
 jest.mock('@/lib/monitoring', () => ({
@@ -167,7 +171,7 @@ jest.mock('@/lib/monitoring', () => ({
     status: 'healthy',
     checks: {}
   }),
-}))
+}), { virtual: true })
 
 // Clean up after each test
 afterEach(() => {
