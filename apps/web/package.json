@@ -13,6 +13,7 @@
     "test:ci": "jest --coverage --watchAll=false --passWithNoTests"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.62.0",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.2.2",
     "@supabase/auth-helpers-nextjs": "^0.10.0",

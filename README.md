@@ -32,10 +32,14 @@
 2. Connect your GitHub account
 3. Add environment variables:
    ```
+   # Required: Supabase Configuration
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+   # AI Providers (at least one required)
    OPENAI_API_KEY=your_openai_api_key
+   ANTHROPIC_API_KEY=your_claude_api_key  # For Claude fallback
    ```
 4. Deploy and enjoy!
 
@@ -113,13 +117,14 @@
 
 ### Environment Variables
 ```bash
-# Supabase Configuration
+# Supabase Configuration (Required)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
+# AI Configuration (At least one required)
+OPENAI_API_KEY=your_openai_api_key         # For GPT models
+ANTHROPIC_API_KEY=your_claude_api_key      # For Claude models (fallback)
 
 # Optional: Monitoring
 NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn
