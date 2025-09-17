@@ -475,26 +475,26 @@ export default function EnhancedHabitTracker() {
           {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white bg-opacity-20 rounded-lg p-3">
-              <div className="text-2xl font-bold">{stats.completedToday}/{stats.totalHabits}</div>
-              <div className="text-sm text-blue-100">Today's Progress</div>
+              <div className="text-2xl font-bold text-white">{stats.completedToday}/{stats.totalHabits}</div>
+              <div className="text-sm text-white font-medium">Today's Progress</div>
             </div>
             <div className="bg-white bg-opacity-20 rounded-lg p-3">
-              <div className="text-2xl font-bold flex items-center">
+              <div className="text-2xl font-bold flex items-center text-white">
                 <FireSolidIcon className="w-6 h-6 text-orange-300 mr-1" />
                 {stats.averageStreak}
               </div>
-              <div className="text-sm text-blue-100">Avg Streak</div>
+              <div className="text-sm text-white font-medium">Avg Streak</div>
             </div>
             <div className="bg-white bg-opacity-20 rounded-lg p-3">
-              <div className="text-2xl font-bold">{stats.completionRate}%</div>
-              <div className="text-sm text-blue-100">Completion Rate</div>
+              <div className="text-2xl font-bold text-white">{stats.completionRate}%</div>
+              <div className="text-sm text-white font-medium">Completion Rate</div>
             </div>
             <div className="bg-white bg-opacity-20 rounded-lg p-3">
-              <div className="text-2xl font-bold flex items-center">
+              <div className="text-2xl font-bold flex items-center text-white">
                 <TrophySolidIcon className="w-6 h-6 text-yellow-300 mr-1" />
                 {stats.longestStreak}
               </div>
-              <div className="text-sm text-blue-100">Best Streak</div>
+              <div className="text-sm text-white font-medium">Best Streak</div>
             </div>
           </div>
         </div>
@@ -639,11 +639,11 @@ export default function EnhancedHabitTracker() {
                         {habit.completedToday && (
                           <button
                             onClick={() => handleUndoCompletion(habit)}
-                            className="flex items-center space-x-1 px-2 py-1 text-sm text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors font-medium"
+                            className="p-1 text-gray-400 hover:text-orange-500 transition-colors rounded-full hover:bg-orange-50"
                             title="Undo completion"
                           >
                             <svg
-                              className="w-4 h-4"
+                              className="w-5 h-5"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -655,7 +655,6 @@ export default function EnhancedHabitTracker() {
                                 d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
                               />
                             </svg>
-                            <span>Undo</span>
                           </button>
                         )}
                       </div>
