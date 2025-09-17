@@ -16,10 +16,8 @@ RUN npm install
 # Copy app source
 COPY apps/web/ ./
 
-# Set dummy environment variables for build (Railway will override these at runtime)
-ENV NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder_key
-ENV SUPABASE_SERVICE_ROLE_KEY=placeholder_service_key
+# Note: NEXT_PUBLIC_ environment variables are injected at build time
+# Railway will provide real values during the build process
 
 # Build the application
 RUN npm run build
