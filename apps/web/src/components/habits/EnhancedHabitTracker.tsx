@@ -33,7 +33,10 @@ import {
   useCompleteHabit,
   useUndoHabitCompletion,
   useArchiveHabit,
+  useHabitStreak,
 } from '@/hooks/useHabits'
+import { useQuickNotifications } from '@/hooks/useNotifications'
+import NotificationCenter from '@/components/notifications/NotificationCenter'
 
 const HABIT_COLORS = [
   { name: 'Ocean Blue', value: '#3B82F6', gradient: 'from-blue-400 to-blue-600' },
@@ -107,6 +110,9 @@ export default function EnhancedHabitTracker() {
   const completeHabitMutation = useCompleteHabit()
   const undoHabitCompletionMutation = useUndoHabitCompletion()
   const archiveHabitMutation = useArchiveHabit()
+
+  // Notification hooks
+  const quickNotifications = useQuickNotifications()
 
   // UI state
   const [showAddForm, setShowAddForm] = useState(false)
@@ -219,10 +225,26 @@ export default function EnhancedHabitTracker() {
         }
       })
 
-      // Trigger celebration for milestones - using mock streak for now
-      if (habit.streak.current_streak > 0 && habit.streak.current_streak % 7 === 0) {
-        console.log(`🎉 ${habit.streak.current_streak} day streak achieved!`)
+      // Calculate new streak (current + 1 since we just completed)
+      const newStreak = habit.streak.current_streak + 1
+      const isNewRecord = newStreak > habit.streak.longest_streak
+
+      // Trigger celebration notification
+      quickNotifications.celebrate(habit.id, habit.name, newStreak, isNewRecord)
+
+      // Check for milestone notifications
+      const milestones = [7, 14, 21, 30, 50, 75, 100, 200, 365]
+      if (milestones.includes(newStreak)) {
+        quickNotifications.milestone(habit.id, habit.name, newStreak)
       }
+
+      // Check for streak at risk prevention (completed just in time)
+      if (habit.streak.is_at_risk) {
+        quickNotifications.encourage(habit.id, habit.name, 'comeback')
+      } else if (newStreak >= 3) {
+        quickNotifications.encourage(habit.id, habit.name, 'keep_going')
+      }
+
     } catch (error) {
       reportError({
         message: 'Failed to complete habit',
@@ -379,6 +401,9 @@ export default function EnhancedHabitTracker() {
             </div>
 
             <div className="flex items-center space-x-3">
+              {/* Notification Center */}
+              <NotificationCenter userId={user?.id || ''} />
+
               <button
                 onClick={() => setShowStats(!showStats)}
                 className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition-colors"

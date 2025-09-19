@@ -2,7 +2,10 @@
 
 import { CheckCircleIcon, ExclamationTriangleIcon, ClockIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import { CheckCircleIcon as CheckCircleSolidIcon } from '@heroicons/react/24/solid'
+import { animationPresets, animations } from '@/config/animations'
 import type { HabitWithStatus } from '@/lib/dashboardService'
+import { DashboardConnectionStatus } from '@/components/ui/ConnectionStatus'
+import { useIsConnected } from '@/contexts/RealtimeContext'
 
 interface TodaysCommandCenterProps {
   habits: HabitWithStatus[]
@@ -17,6 +20,7 @@ export default function TodaysCommandCenter({
   onViewHabits,
   completionAnimation
 }: TodaysCommandCenterProps) {
+  const isConnected = useIsConnected()
   const pendingHabits = habits.filter(h => !h.completedToday)
   const atRiskHabits = habits.filter(h => h.isAtRisk)
   const completedHabits = habits.filter(h => h.completedToday)
@@ -29,25 +33,35 @@ export default function TodaysCommandCenter({
   ].slice(0, 4) // Show max 4 total
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 lg:p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className={`bg-white rounded-xl border border-gray-200 p-4 lg:p-6 ${animations.cards.hover}`}>
       <div className="flex items-center justify-between mb-4 lg:mb-6">
-        <div>
-          <h3 className="text-lg lg:text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <SparklesIcon className="h-5 w-5 text-blue-500" />
-            Today's Focus
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            {pendingHabits.length > 0
-              ? `${pendingHabits.length} habit${pendingHabits.length > 1 ? 's' : ''} pending`
-              : 'All habits completed! 🎉'
-            }
-          </p>
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg lg:text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <SparklesIcon className="h-5 w-5 text-blue-500" />
+              Today's Focus
+            </h3>
+            <DashboardConnectionStatus />
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-sm text-gray-600">
+              {pendingHabits.length > 0
+                ? `${pendingHabits.length} habit${pendingHabits.length > 1 ? 's' : ''} pending`
+                : 'All habits completed! 🎉'
+              }
+            </p>
+            {isConnected && (
+              <span className="text-xs text-green-600 opacity-75 hidden sm:block">
+                Live sync active
+              </span>
+            )}
+          </div>
         </div>
 
         {habits.length > 4 && (
           <button
             onClick={onViewHabits}
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:bg-blue-50 px-3 py-1 rounded-md transition-colors min-h-[32px]"
+            className={`text-sm text-blue-600 hover:text-blue-700 font-medium hover:bg-blue-50 px-3 py-1 rounded-md ${animations.transitions.normal.colors} min-h-[32px]`}
           >
             View all
           </button>
@@ -65,7 +79,7 @@ export default function TodaysCommandCenter({
           </p>
           <button
             onClick={onViewHabits}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 active:scale-95 font-medium shadow-sm min-h-[44px]"
+            className={`bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium shadow-sm min-h-[44px] ${animationPresets.primaryButton}`}
           >
             Create your first habit
           </button>
@@ -81,7 +95,7 @@ export default function TodaysCommandCenter({
             return (
               <div
                 key={habit.id}
-                className={`p-3 lg:p-4 rounded-lg border-2 transition-all duration-300 hover:shadow-sm ${
+                className={`p-3 lg:p-4 rounded-lg border-2 ${animations.transitions.slow.all} hover:shadow-sm ${
                   habit.completedToday
                     ? 'bg-green-50 border-green-200 animate-completion'
                     : habit.isAtRisk
@@ -94,7 +108,7 @@ export default function TodaysCommandCenter({
                     <button
                       onClick={() => !habit.completedToday && onCompleteHabit(habit.id)}
                       disabled={habit.completedToday}
-                      className="transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-default flex-shrink-0"
+                      className={`${animations.habits.complete} disabled:cursor-default flex-shrink-0`}
                       title={habit.completedToday ? 'Completed!' : 'Mark as complete'}
                     >
                       {habit.completedToday ? (
@@ -117,6 +131,13 @@ export default function TodaysCommandCenter({
                           <div className="flex items-center space-x-1 text-red-600 flex-shrink-0 animate-pulse">
                             <ExclamationTriangleIcon className="h-4 w-4" />
                             <span className="text-xs font-medium">At risk</span>
+                          </div>
+                        )}
+
+                        {habit.completedToday && isConnected && (
+                          <div className="flex items-center space-x-1 text-green-600 flex-shrink-0">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs font-medium">Live</span>
                           </div>
                         )}
                       </div>
@@ -146,7 +167,7 @@ export default function TodaysCommandCenter({
                   {!habit.completedToday && (
                     <button
                       onClick={() => onCompleteHabit(habit.id)}
-                      className={`px-3 py-2 rounded-full text-xs font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 min-h-[32px] min-w-[80px] ${
+                      className={`px-3 py-2 rounded-full text-xs font-medium min-h-[32px] min-w-[80px] ${animations.habits.quickAction} ${
                         habit.isAtRisk
                           ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
                           : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
@@ -167,7 +188,7 @@ export default function TodaysCommandCenter({
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button
                   onClick={() => pendingHabits.forEach(h => onCompleteHabit(h.id))}
-                  className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 active:scale-95 text-sm font-medium shadow-sm min-h-[44px] flex items-center justify-center gap-2"
+                  className={`flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm min-h-[44px] flex items-center justify-center gap-2 ${animationPresets.primaryButton}`}
                 >
                   <CheckCircleIcon className="h-4 w-4" />
                   Complete all ({pendingHabits.length})
@@ -176,7 +197,7 @@ export default function TodaysCommandCenter({
                 {atRiskHabits.length > 0 && (
                   <button
                     onClick={() => atRiskHabits.filter(h => !h.completedToday).forEach(h => onCompleteHabit(h.id))}
-                    className="flex-1 bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-all duration-200 transform hover:scale-105 active:scale-95 text-sm font-medium shadow-sm min-h-[44px] flex items-center justify-center gap-2"
+                    className={`flex-1 bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 text-sm font-medium shadow-sm min-h-[44px] flex items-center justify-center gap-2 ${animationPresets.primaryButton}`}
                   >
                     <ExclamationTriangleIcon className="h-4 w-4" />
                     Save streaks ({atRiskHabits.filter(h => !h.completedToday).length})

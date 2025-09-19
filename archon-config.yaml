@@ -1,16 +1,57 @@
+# Archon Project Configuration
+# Enhanced during migration to support orchestration
+
+project:
+  name: "personal-guide"
+  type: "fullstack"  # Updated for better Archon compatibility
+  description: "AI-powered personal assistance application with orchestration"
+  github_repo: ""  # Add if available
+  archon_project_id: "13d82d10-9563-48ef-a5f8-316f1a4e2f50"
+
+# Archon MCP Server Configuration
+mcp:
+  server_url: "http://localhost:8051"
+  api_url: "http://localhost:8181"
+
+# Task Management Settings
+tasks:
+  auto_sync: true  # Automatically sync BMad tasks with Archon
+  default_status: "todo"
+  workflow: ["todo", "doing", "review", "done"]
+
+# Knowledge Base Settings
+knowledge:
+  auto_index: true  # Automatically index project docs
+  sources:
+    - type: "local"
+      path: "./docs"
+    - type: "local"
+      path: "./.bmad-core/data"
+    - type: "local"
+      path: "./src"
+
+# Integration Settings
+integrations:
+  bmad:
+    enabled: true
+    sync_interval: "on_command"
+    orchestrator_version: "2.0"
+  claude_code:
+    enabled: true
+  cursor:
+    enabled: true
+
+# Feature Flags
+features:
+  projects: true
+  tasks: true
+  knowledge_base: true
+  real_time_updates: true
+  ai_agents: true
+  technical_memory: true
+
+# Legacy settings preserved
 archon:
   api_url: "http://localhost:8181"
   ui_url: "http://localhost:3737"
   mcp_url: "http://localhost:8051"
-
-project:
-  name: "personal-guide"
-  type: "ai-powered-application"
-  sync_with_archon: true
-  upload_docs: true
-  
-features:
-  - "AI personal assistance"
-  - "Task management"
-  - "Knowledge organization"
-  - "Personalized recommendations"

@@ -1,5 +1,5 @@
 // Tab Navigation Types
-export type TabType = 'dashboard' | 'chat' | 'habits' | 'routines' | 'beliefs' | 'goals' | 'spiritual' | 'journal'
+export type TabType = 'dashboard' | 'chat' | 'habits' | 'routines' | 'beliefs' | 'goals' | 'spiritual' | 'journal' | 'reflections'
 
 export interface Tab {
   id: TabType

@@ -14,6 +14,16 @@ import {
 // Import mood analysis types
 import type { MoodCategory, MoodAnalysisResponse } from '../analyze-mood/route'
 
+// Import AI Context Service
+import {
+  gatherUserContext,
+  summarizeContext,
+  createCompactContext,
+  hasPersonalizationData,
+  type UserContext,
+  type ContextualPrompt
+} from '@/lib/aiContextService'
+
 // Import types
 interface Message {
   role: 'system' | 'user' | 'assistant'
@@ -25,6 +35,9 @@ interface ChatRequest {
   messages?: Message[]
   personalityMode?: PersonalityMode
   aiProvider?: 'openai' | 'anthropic' | 'auto'
+  userId?: string
+  includePersonalContext?: boolean
+  contextTimeframe?: 'recent' | 'week' | 'month'
 }
 
 interface ChatResponse {
@@ -37,6 +50,9 @@ interface ChatResponse {
   mood_confidence?: number
   emotional_keywords?: string[]
   suggestedPersonality?: PersonalityMode
+  contextUsed?: boolean
+  contextConfidence?: number
+  personalizedInsights?: string[]
 }
 
 // Provider configuration
@@ -139,12 +155,55 @@ function detectMoodSimple(message: string): string {
   return 'neutral'
 }
 
-// Function to enhance system prompt with conversation context and mood
+// Helper function to generate personalized insights from user context
+function generatePersonalizedInsights(
+  userContext: UserContext,
+  moodData: { mood: string; confidence: number; emotionalKeywords: string[] }
+): string[] {
+  const insights: string[] = []
+
+  // Habit-related insights
+  if (userContext.habits.strugglingHabits.length > 0) {
+    insights.push(`You have ${userContext.habits.strugglingHabits.length} habit${userContext.habits.strugglingHabits.length > 1 ? 's' : ''} that could use attention`)
+  }
+
+  if (userContext.habits.successfulHabits.length > 0) {
+    insights.push(`You're maintaining strong momentum with ${userContext.habits.successfulHabits.length} successful habit${userContext.habits.successfulHabits.length > 1 ? 's' : ''}`)
+  }
+
+  // Performance insights
+  if (userContext.performance.stats.dailyCompletionRate > 0.8) {
+    insights.push('Your completion rate shows excellent consistency')
+  } else if (userContext.performance.stats.dailyCompletionRate < 0.5) {
+    insights.push('Focus on small, achievable daily goals to build momentum')
+  }
+
+  // Mood-context insights
+  if (moodData.mood === 'negative' && userContext.journal.moodTrend.direction === 'declining') {
+    insights.push('Your mood and journaling patterns suggest this might be a good time for self-care')
+  }
+
+  // Pattern insights
+  userContext.habits.patterns.forEach(pattern => {
+    if (pattern.confidence > 70) {
+      if (pattern.pattern === 'struggling') {
+        insights.push(`${pattern.habitName} might benefit from a different approach`)
+      } else if (pattern.pattern === 'consistent') {
+        insights.push(`${pattern.habitName} is a strength you can build on`)
+      }
+    }
+  })
+
+  return insights.slice(0, 3) // Return max 3 insights
+}
+
+// Function to enhance system prompt with user context and conversation history
 function buildContextualSystemPrompt(
   basePrompt: string,
   personalityMode: PersonalityMode,
   conversationHistory: Message[] = [],
-  moodData: { mood: string; confidence: number; emotionalKeywords: string[]; details?: any }
+  moodData: { mood: string; confidence: number; emotionalKeywords: string[]; details?: any },
+  userContext?: UserContext
 ): string {
   const personalityConfig = getPersonalityConfig(personalityMode)
   let contextualAddition = ''
@@ -208,6 +267,13 @@ function buildContextualSystemPrompt(
     contextualAddition += '\n\nConversation context: Maintain continuity with the ongoing conversation while staying true to your personality. Reference previous exchanges naturally when relevant.'
   }
 
+  // Add user context for personalized responses
+  if (userContext && hasPersonalizationData(userContext)) {
+    contextualAddition += '\n\n# Personal Context\n'
+    contextualAddition += createCompactContext(userContext)
+    contextualAddition += '\n\nUse this personal context to provide highly relevant, personalized advice. Reference specific habits, patterns, and insights when appropriate. Be encouraging about their progress and constructive about areas needing attention.'
+  }
+
   return basePrompt + contextualAddition
 }
 
@@ -216,7 +282,10 @@ async function generateAIResponse(
   message: string,
   conversationHistory: Message[] = [],
   personalityMode: PersonalityMode = 'mentor',
-  preferredProvider?: 'openai' | 'anthropic' | 'auto'
+  preferredProvider?: 'openai' | 'anthropic' | 'auto',
+  userId?: string,
+  includePersonalContext?: boolean,
+  contextTimeframe?: 'recent' | 'week' | 'month'
 ): Promise<{
   response: string
   provider: string
@@ -224,6 +293,9 @@ async function generateAIResponse(
   moodConfidence: number
   emotionalKeywords: string[]
   suggestedPersonality?: PersonalityMode
+  contextUsed?: boolean
+  contextConfidence?: number
+  personalizedInsights?: string[]
 }> {
 
   // Enhanced mood detection with service
@@ -232,12 +304,38 @@ async function generateAIResponse(
   const baseSystemPrompt = getPersonalitySystemPrompt(personalityMode)
   const temperature = getPersonalityTemperature(personalityMode)
 
-  // Build contextual system prompt with mood insights
+  // Gather user context if requested and userId provided
+  let userContext: UserContext | undefined
+  let contextUsed = false
+  let contextConfidence = 0
+  let personalizedInsights: string[] = []
+
+  if (includePersonalContext && userId) {
+    try {
+      console.log(`Gathering personal context for user ${userId} (timeframe: ${contextTimeframe})`)
+      userContext = await gatherUserContext(userId, contextTimeframe || 'recent')
+      contextUsed = hasPersonalizationData(userContext)
+      contextConfidence = userContext.meta.confidenceScore
+
+      // Generate personalized insights based on context
+      if (contextUsed) {
+        personalizedInsights = generatePersonalizedInsights(userContext, moodData)
+      }
+
+      console.log(`Context gathered: ${userContext.meta.dataPoints} data points, ${contextConfidence}% confidence`)
+    } catch (error) {
+      console.error('Failed to gather user context:', error)
+      // Continue without context on error
+    }
+  }
+
+  // Build contextual system prompt with mood insights and user context
   const contextualSystemPrompt = buildContextualSystemPrompt(
     baseSystemPrompt,
     personalityMode,
     conversationHistory,
-    moodData
+    moodData,
+    userContext
   )
 
   // Prepare messages for the conversation
@@ -317,6 +415,9 @@ async function generateAIResponse(
           mood: moodData.mood,
           moodConfidence: moodData.confidence,
           emotionalKeywords: moodData.emotionalKeywords,
+          contextUsed,
+          contextConfidence,
+          personalizedInsights,
           ...(suggestedPersonality && { suggestedPersonality })
         }
       }
@@ -387,13 +488,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Request body is required' }, { status: 400 })
     }
 
-    const { message, messages = [], personalityMode = 'mentor', aiProvider } = body
+    const {
+      message,
+      messages = [],
+      personalityMode = 'mentor',
+      aiProvider,
+      userId,
+      includePersonalContext = false,
+      contextTimeframe = 'recent'
+    } = body
 
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    console.log(`Processing message with ${aiProvider || 'auto'} provider and ${personalityMode} personality`)
+    console.log(`Processing message with ${aiProvider || 'auto'} provider and ${personalityMode} personality${includePersonalContext ? ` (with context for user ${userId})` : ''}`)
 
     // Generate AI response using enhanced personality and mood system
     const {
@@ -402,12 +511,18 @@ export async function POST(request: NextRequest) {
       mood,
       moodConfidence,
       emotionalKeywords,
-      suggestedPersonality
+      suggestedPersonality,
+      contextUsed,
+      contextConfidence,
+      personalizedInsights
     } = await generateAIResponse(
       message.trim(),
       messages,
       personalityMode,
-      aiProvider
+      aiProvider,
+      userId,
+      includePersonalContext,
+      contextTimeframe
     )
 
     // Build response object
@@ -419,7 +534,10 @@ export async function POST(request: NextRequest) {
       mood,
       mood_confidence: moodConfidence,
       emotional_keywords: emotionalKeywords,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      contextUsed,
+      contextConfidence,
+      personalizedInsights
     }
 
     // Add personality suggestion if applicable

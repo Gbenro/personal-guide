@@ -18,13 +18,18 @@ import {
   getTodayCompletions,
   calculateStreak,
   getHabitCompletionsRange,
+  getHabitInsights,
+  getHabitContextAnalytics,
+  getStreakAnalytics,
   type Habit,
   type HabitEntry,
   type HabitStreak,
   type HabitSearchFilters,
   type HabitStats,
+  type StreakAnalytics,
 } from '@/lib/habitService'
 import { queryKeys } from '@/lib/queryClient'
+import { useAutoRealtimeSync } from './useRealtimeSync'
 
 // Query hooks for reading data
 export function useHabits(userId: string) {
@@ -72,7 +77,10 @@ export function useTodayCompletions(userId: string) {
     queryKey: queryKeys.habitCompletions.today(userId),
     queryFn: () => getTodayCompletions(userId),
     enabled: !!userId,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    // Remove polling since we now have real-time updates
+    refetchInterval: false,
+    // Keep data fresh for 1 minute, real-time updates will handle the rest
+    staleTime: 60000,
   })
 }
 
@@ -316,11 +324,14 @@ export function useUndoHabitCompletion() {
   })
 }
 
-// Combined hook for habits with completions and streaks
+// Combined hook for habits with completions and streaks - includes real-time sync
 export function useHabitsWithDetails(userId: string) {
   const habitsQuery = useHabits(userId)
   const completionsQuery = useTodayCompletions(userId)
   const statsQuery = useHabitStats(userId)
+
+  // Enable real-time sync for this user
+  const { forceSync } = useAutoRealtimeSync(userId)
 
   return {
     habits: habitsQuery.data || [],
@@ -333,5 +344,55 @@ export function useHabitsWithDetails(userId: string) {
       completionsQuery.refetch()
       statsQuery.refetch()
     },
+    // Force sync function for manual cache updates
+    forceSync,
   }
+}
+
+// Real-time enabled habits hook - automatically syncs with live updates
+export function useRealtimeHabits(userId: string) {
+  const habitsQuery = useHabits(userId)
+
+  // Enable real-time sync
+  useAutoRealtimeSync(userId)
+
+  return habitsQuery
+}
+
+// Real-time enabled completions hook
+export function useRealtimeTodayCompletions(userId: string) {
+  const completionsQuery = useTodayCompletions(userId)
+
+  // Enable real-time sync
+  useAutoRealtimeSync(userId)
+
+  return completionsQuery
+}
+
+// Analytics hooks for AI insights
+export function useHabitInsights(habitId: string, userId: string) {
+  return useQuery({
+    queryKey: ['habitInsights', habitId, userId],
+    queryFn: () => getHabitInsights(habitId, userId),
+    enabled: !!habitId && !!userId,
+    staleTime: 10 * 60 * 1000, // 10 minutes - insights don't change frequently
+  })
+}
+
+export function useHabitContextAnalytics(userId: string) {
+  return useQuery({
+    queryKey: ['habitContextAnalytics', userId],
+    queryFn: () => getHabitContextAnalytics(userId),
+    enabled: !!userId,
+    staleTime: 15 * 60 * 1000, // 15 minutes - analytics are less time-sensitive
+  })
+}
+
+export function useStreakAnalytics(habitId: string, userId: string) {
+  return useQuery({
+    queryKey: ['streakAnalytics', habitId, userId],
+    queryFn: () => getStreakAnalytics(habitId, userId),
+    enabled: !!habitId && !!userId,
+    staleTime: 10 * 60 * 1000, // 10 minutes - analytics update less frequently
+  })
 }

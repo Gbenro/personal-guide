@@ -64,6 +64,13 @@ const tabs: Tab[] = [
     description: 'Document your thoughts, track your mood, and reflect on your journey'
   },
   {
+    id: 'reflections',
+    name: 'Reflections',
+    icon: LightBulbIcon,
+    ariaLabel: 'Reflections - Browse and explore your insights and learnings',
+    description: 'Review your insights, patterns, and personal growth journey'
+  },
+  {
     id: 'spiritual',
     name: 'Spiritual',
     icon: SparklesIcon,

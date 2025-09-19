@@ -544,6 +544,20 @@ export const useJournalEntries = () => usePersonalGuideStore(state => state.jour
 // Create a memoized selector for filtered journal entries
 const selectFilteredJournalEntries = (state: PersonalGuideState) => {
   const { journalEntries, journalFilters } = state
+
+  // Early return if no filters applied - return original array reference
+  const hasFilters = journalFilters.searchQuery ||
+                     journalFilters.showFavoritesOnly ||
+                     journalFilters.mood ||
+                     (journalFilters.tags && journalFilters.tags.length > 0) ||
+                     journalFilters.dateRange ||
+                     journalFilters.sortBy !== 'created_at' ||
+                     journalFilters.sortOrder !== 'desc'
+
+  if (!hasFilters) {
+    return journalEntries // Return original reference when no filtering needed
+  }
+
   let filtered = [...journalEntries]
 
   // Apply filters
@@ -597,7 +611,25 @@ const selectFilteredJournalEntries = (state: PersonalGuideState) => {
   return filtered
 }
 
-export const useFilteredJournalEntries = () => usePersonalGuideStore(selectFilteredJournalEntries)
+export const useFilteredJournalEntries = () => {
+  return usePersonalGuideStore(
+    selectFilteredJournalEntries,
+    // Use shallow comparison to prevent infinite loops
+    (prev, curr) => {
+      if (!prev || !curr) return false
+      if (prev.length !== curr.length) return false
+
+      // Quick check if arrays are reference equal
+      if (prev === curr) return true
+
+      // Compare each entry by ID to see if the selection actually changed
+      for (let i = 0; i < prev.length; i++) {
+        if (prev[i].id !== curr[i].id) return false
+      }
+      return true
+    }
+  )
+}
 
 // Mood Selectors
 export const useRecentMoodEntries = () => usePersonalGuideStore(state => state.recentMoodEntries)

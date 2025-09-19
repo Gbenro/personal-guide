@@ -80,6 +80,10 @@ export default function EnhancedChatInterface() {
   const [lastMood, setLastMood] = useState<string | null>(null)
   const [lastMoodConfidence, setLastMoodConfidence] = useState<number | null>(null)
   const [lastEmotionalKeywords, setLastEmotionalKeywords] = useState<string[]>([])
+  const [includePersonalContext, setIncludePersonalContext] = useState(true)
+  const [contextConfidence, setContextConfidence] = useState<number | null>(null)
+  const [personalizedInsights, setPersonalizedInsights] = useState<string[]>([])
+  const [contextTimeframe, setContextTimeframe] = useState<'recent' | 'week' | 'month'>('recent')
   const [uiState, setUIState] = useState<ChatUIState>({
     isCollapsed: false,
     showMoodInsights: true,
@@ -245,7 +249,10 @@ export default function EnhancedChatInterface() {
             message: messageText,
             messages: [...messages, userMessage].slice(-10),
             personalityMode,
-            aiProvider: selectedAIProvider === 'auto' ? undefined : selectedAIProvider
+            aiProvider: selectedAIProvider === 'auto' ? undefined : selectedAIProvider,
+            userId: user.id,
+            includePersonalContext,
+            contextTimeframe
           })
         })
 
@@ -283,6 +290,8 @@ export default function EnhancedChatInterface() {
       setLastMood(response.mood)
       setLastMoodConfidence(response.mood_confidence)
       setLastEmotionalKeywords(response.emotional_keywords || [])
+      setContextConfidence(response.contextConfidence)
+      setPersonalizedInsights(response.personalizedInsights || [])
       setMessages(prev => [...prev, aiResponse])
 
       // Handle personality suggestions
@@ -487,6 +496,19 @@ export default function EnhancedChatInterface() {
                      title="AI Guide is active"></div>
                 <h3 className="font-semibold text-gray-800">Personal Guide Chat</h3>
               </div>
+
+              {/* Context indicators */}
+              {includePersonalContext && contextConfidence !== null && (
+                <div className="px-3 py-1 bg-blue-50 bg-opacity-70 rounded-full border border-blue-200">
+                  <span className="text-sm flex items-center space-x-1">
+                    <span>🧠</span>
+                    <span className="text-blue-700">
+                      Personal Context ({contextConfidence}%)
+                    </span>
+                  </span>
+                </div>
+              )}
+
               {lastMood && lastMood !== 'neutral' && (
                 <div className="px-3 py-1 bg-white bg-opacity-70 rounded-full border border-gray-200">
                   <span className="text-sm flex items-center space-x-1">
@@ -500,6 +522,37 @@ export default function EnhancedChatInterface() {
             </div>
 
             <div className="flex items-center space-x-2">
+              {/* Context Settings */}
+              <div className="relative group">
+                <button
+                  onClick={() => setIncludePersonalContext(!includePersonalContext)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    includePersonalContext
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                  title={includePersonalContext ? 'Personal context enabled' : 'Personal context disabled'}
+                >
+                  🧠
+                </button>
+                {includePersonalContext && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto">
+                    <div className="p-2">
+                      <div className="text-xs text-gray-600 mb-1">Context timeframe:</div>
+                      <select
+                        value={contextTimeframe}
+                        onChange={(e) => setContextTimeframe(e.target.value as 'recent' | 'week' | 'month')}
+                        className="text-xs border border-gray-200 rounded p-1 w-full"
+                      >
+                        <option value="recent">Recent</option>
+                        <option value="week">This week</option>
+                        <option value="month">This month</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <PersonalitySelector
                 selectedMode={personalityMode}
                 onModeChange={handlePersonalityChange}
@@ -539,6 +592,29 @@ export default function EnhancedChatInterface() {
                         className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                     {keyword}
                   </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Personalized Insights */}
+          {personalizedInsights.length > 0 && !uiState.isCollapsed && (
+            <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-purple-700">AI Insights Based on Your Data</span>
+                <button
+                  onClick={() => setPersonalizedInsights([])}
+                  className="text-xs text-purple-500 hover:text-purple-700"
+                >
+                  Hide
+                </button>
+              </div>
+              <div className="space-y-1">
+                {personalizedInsights.map((insight, index) => (
+                  <div key={index} className="flex items-start space-x-2">
+                    <span className="text-purple-600 text-xs mt-1">💡</span>
+                    <span className="text-sm text-purple-800">{insight}</span>
+                  </div>
                 ))}
               </div>
             </div>
