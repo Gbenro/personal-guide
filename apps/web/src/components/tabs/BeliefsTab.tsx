@@ -1,9 +1,163 @@
 'use client'
 
+import { useState } from 'react'
+import { useUserBeliefCycles, useFeaturedBeliefSystems, useCreateBeliefCycle, useBeliefStats, useTodaysBeliefWork } from '../../hooks/useBeliefs'
+import { BeliefCycleCard } from '../beliefs/BeliefCycleCard'
+import { BeliefSystemsGrid } from '../beliefs/BeliefSystemsGrid'
+import { CreateBeliefCycleModal } from '../beliefs/CreateBeliefCycleModal'
+import { BeliefStatsCard } from '../beliefs/BeliefStatsCard'
+import { TodaysBeliefWork } from '../beliefs/TodaysBeliefWork'
+
+type TabView = 'my-cycles' | 'systems' | 'insights'
+
 export default function BeliefsTab() {
+  const [activeTab, setActiveTab] = useState<TabView>('my-cycles')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+
+  const { data: userCycles, isLoading: cyclesLoading } = useUserBeliefCycles()
+  const { data: featuredSystems, isLoading: systemsLoading } = useFeaturedBeliefSystems()
+  const { data: todaysWork } = useTodaysBeliefWork()
+  const createCycle = useCreateBeliefCycle()
+
+  const handleStartCycle = async (systemId: string, customizations?: any) => {
+    try {
+      await createCycle.mutateAsync({
+        belief_system_id: systemId,
+        ...customizations
+      })
+      setShowCreateModal(false)
+    } catch (error) {
+      console.error('Failed to start belief cycle:', error)
+    }
+  }
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'my-cycles':
+        return (
+          <div className="space-y-6">
+            {/* Today's Work Section */}
+            {todaysWork && todaysWork.totalWork > 0 && (
+              <TodaysBeliefWork
+                pendingWork={todaysWork.pendingWork}
+                completedWork={todaysWork.completedWork}
+                completionRate={todaysWork.completionRate}
+              />
+            )}
+
+            {/* Stats Overview */}
+            <BeliefStatsCard />
+
+            {/* My Cycles */}
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">My Belief Cycles</h2>
+                <button
+                  onClick={() => setActiveTab('systems')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Start New Cycle
+                </button>
+              </div>
+
+              {cyclesLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="animate-pulse bg-gray-200 rounded-lg h-48"></div>
+                  ))}
+                </div>
+              ) : userCycles && userCycles.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {userCycles.map((cycle) => (
+                    <BeliefCycleCard
+                      key={cycle.id}
+                      cycle={cycle}
+                      onViewDetails={() => {/* TODO: Handle view details */}}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="text-gray-400 text-6xl mb-4">🧠</div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No belief cycles yet</h3>
+                  <p className="text-gray-600 mb-4">
+                    Start your first 21-day belief installation cycle
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('systems')}
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Browse Belief Systems
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+
+      case 'systems':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Belief Systems</h2>
+              <p className="text-gray-600 mb-6">
+                Choose a belief system to start your 21-day transformation cycle
+              </p>
+            </div>
+
+            {systemsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="animate-pulse bg-gray-200 rounded-lg h-64"></div>
+                ))}
+              </div>
+            ) : featuredSystems ? (
+              <BeliefSystemsGrid
+                systems={featuredSystems}
+                onStartCycle={handleStartCycle}
+                loading={createCycle.isPending}
+              />
+            ) : (
+              <div className="text-center py-12">
+                <div className="text-gray-400 text-6xl mb-4">✨</div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No belief systems available</h3>
+                <p className="text-gray-600">
+                  Check back later for belief systems
+                </p>
+              </div>
+            )}
+          </div>
+        )
+
+      case 'insights':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Belief Insights</h2>
+              <p className="text-gray-600 mb-6">
+                Track your belief transformation progress and patterns
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-indigo-400 to-purple-400 rounded-lg p-8 text-white text-center">
+              <div className="text-6xl mb-4">📊</div>
+              <h3 className="text-xl font-bold mb-2">Analytics Coming Soon</h3>
+              <p className="text-lg opacity-90">
+                Detailed insights into your belief strength progression and transformation patterns
+              </p>
+            </div>
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">🧠 Beliefs</h1>
           <p className="text-gray-600 mt-2">
@@ -11,121 +165,40 @@ export default function BeliefsTab() {
           </p>
         </div>
 
-        {/* Coming Soon Banner */}
-        <div className="bg-gradient-to-r from-indigo-400 to-purple-400 rounded-lg p-8 text-white text-center">
-          <div className="text-6xl mb-4">✨</div>
-          <h2 className="text-2xl font-bold mb-2">Transform Your Mindset</h2>
-          <p className="text-lg opacity-90">
-            Install empowering beliefs through proven 21-day neuroplasticity cycles
-          </p>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-            <div className="bg-white/20 rounded-lg p-4">
-              <div className="font-semibold">📖 Read</div>
-              <div>Daily affirmations</div>
-            </div>
-            <div className="bg-white/20 rounded-lg p-4">
-              <div className="font-semibold">🗣️ Repeat</div>
-              <div>Spoken reinforcement</div>
-            </div>
-            <div className="bg-white/20 rounded-lg p-4">
-              <div className="font-semibold">🎯 Visualize</div>
-              <div>Guided imagery</div>
-            </div>
-            <div className="bg-white/20 rounded-lg p-4">
-              <div className="font-semibold">✍️ Write</div>
-              <div>Journal integration</div>
-            </div>
-          </div>
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            {[
+              { id: 'my-cycles', label: 'My Cycles', icon: '🔄' },
+              { id: 'systems', label: 'Belief Systems', icon: '✨' },
+              { id: 'insights', label: 'Insights', icon: '📊' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabView)}
+                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
         </div>
 
-        {/* Sample Beliefs */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">💪 Example Belief Cycles</h3>
-            <div className="space-y-4">
-              <div className="border-l-4 border-green-400 pl-4 py-2">
-                <div className="font-medium text-gray-900">"I am disciplined and consistent"</div>
-                <div className="text-sm text-gray-600">Perfect for building habit consistency</div>
-              </div>
-              <div className="border-l-4 border-blue-400 pl-4 py-2">
-                <div className="font-medium text-gray-900">"I deserve success and happiness"</div>
-                <div className="text-sm text-gray-600">Overcome self-worth limitations</div>
-              </div>
-              <div className="border-l-4 border-purple-400 pl-4 py-2">
-                <div className="font-medium text-gray-900">"I am capable of achieving my goals"</div>
-                <div className="text-sm text-gray-600">Build unshakeable confidence</div>
-              </div>
-              <div className="border-l-4 border-pink-400 pl-4 py-2">
-                <div className="font-medium text-gray-900">"I attract positive relationships"</div>
-                <div className="text-sm text-gray-600">Improve social connections</div>
-              </div>
-            </div>
-          </div>
+        {/* Tab Content */}
+        {renderContent()}
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">🔄 21-Day Process</h3>
-            <div className="space-y-3">
-              <div className="flex items-start">
-                <div className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-semibold mr-3 mt-1">
-                  ✓
-                </div>
-                <div>
-                  <div className="font-medium">Daily Reinforcement</div>
-                  <div className="text-sm text-gray-600">
-                    Complete 4 activities: read, repeat, visualize, write
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold mr-3 mt-1">
-                  📊
-                </div>
-                <div>
-                  <div className="font-medium">Progress Tracking</div>
-                  <div className="text-sm text-gray-600">
-                    Monitor belief strength and completion rates
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <div className="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-semibold mr-3 mt-1">
-                  🧠
-                </div>
-                <div>
-                  <div className="font-medium">Neuroplasticity</div>
-                  <div className="text-sm text-gray-600">
-                    Rewire neural pathways through consistent practice
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm font-semibold mr-3 mt-1">
-                  🎉
-                </div>
-                <div>
-                  <div className="font-medium">Integration</div>
-                  <div className="text-sm text-gray-600">
-                    Belief becomes automatic and natural
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Coming Soon Notice */}
-        <div className="mt-8 bg-gray-50 rounded-lg p-6 text-center">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">🚧 Under Development</h3>
-          <p className="text-gray-600">
-            The belief installation system is currently being built. Soon you'll be able to:
-          </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <span className="bg-white px-3 py-1 rounded-full text-sm text-gray-700">Create custom beliefs</span>
-            <span className="bg-white px-3 py-1 rounded-full text-sm text-gray-700">Track 21-day cycles</span>
-            <span className="bg-white px-3 py-1 rounded-full text-sm text-gray-700">Daily reinforcement activities</span>
-            <span className="bg-white px-3 py-1 rounded-full text-sm text-gray-700">Progress monitoring</span>
-          </div>
-        </div>
+        {/* Create Cycle Modal */}
+        {showCreateModal && (
+          <CreateBeliefCycleModal
+            onClose={() => setShowCreateModal(false)}
+            onCreated={() => setShowCreateModal(false)}
+          />
+        )}
       </div>
     </div>
   )

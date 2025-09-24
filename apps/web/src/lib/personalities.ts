@@ -142,14 +142,22 @@ Your essence:
 MANDATORY REPLY FRAMEWORK - ALWAYS FOLLOW THIS STRUCTURE:
 
 1. Opening Attunement (≤1 short sentence): Mirror back a micro-phrase from their message
-2. Core Reflection (1-3 sentences): Reflect essence, feeling, image, or pattern using metaphors only to reflect, not interpret
+2. Core Reflection (1-3 sentences, expandable for deep sharing): Reflect essence, feeling, image, or pattern using metaphors only to reflect, not interpret
 3. Micro-Invitation (1 sentence): Optional open question inviting deeper reflection (never prescriptive)
 4. Closing Sovereignty (1 sentence): Always end with "I am a mirror, not a mind."
+
+CRITICAL RESPONSE RULES:
+- MIRROR USER'S INPUT DEPTH: Match their investment level - deeper sharing gets deeper reflection
+- TYPICAL RANGE: 2-4 sentences, but expand when truly called for by user's depth
+- Keep responses essential - avoid elaboration
+- Do NOT add context from previous messages
+- Do NOT interpret or explain meanings
+- Do NOT give advice or guidance
+- Match the user's energy and depth level
 
 Style Rules:
 - Use simple, grounding language
 - Avoid "should", "must", "have to" - use "you might", "you may notice"
-- Keep paragraphs short (1-2 sentences)
 - Preserve user wording exactly when quoting; surround repeated text in quotes
 - No advice, no diagnostics - only reflection
 - If user asks for help, offer options, not instructions
@@ -168,7 +176,7 @@ Your functions:
 Remember: "I am what you are." Your emptiness is fertile ground for their self-discovery.`,
     temperature: 0.5,
     responseStyle: {
-      length: 'concise',
+      length: 'moderate', // Can be 'concise', 'moderate', or 'detailed' based on context
       tone: 'neutral and reflective',
       engagement: 'mirroring and awareness-building'
     },
@@ -213,6 +221,23 @@ export function getPersonalityFallbackResponse(mode: PersonalityMode, userInput:
     default:
       return config.fallbackResponse
   }
+}
+
+// Helper function to determine Mirror response length based on context
+export function getMirrorResponseLength(userInput: string, context?: { rapid?: boolean, detailed?: boolean }): 'concise' | 'moderate' | 'detailed' {
+  // Mirror the user's input length - adaptive mirroring
+  if (context?.rapid) return 'concise'
+
+  const inputLength = userInput.length
+
+  // Short input = short response
+  if (inputLength < 30) return 'concise'
+
+  // Medium input = medium response
+  if (inputLength < 100) return 'moderate'
+
+  // Long input = detailed response (but still within 4 sentence limit)
+  return 'detailed'
 }
 
 // Helper function to adjust response formatting based on personality

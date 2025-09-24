@@ -188,10 +188,10 @@ export function DetailedConnectionStatus() {
 
 // Floating connection status indicator
 export function FloatingConnectionStatus() {
-  const { isConnected } = useConnectionHealth()
+  const { isConnected, hasError } = useConnectionHealth()
 
-  // Only show when disconnected or having issues
-  if (isConnected) return null
+  // Only show when there's an actual error, not just disconnected
+  if (isConnected || !hasError) return null
 
   return (
     <div className="fixed bottom-4 right-4 z-50 md:bottom-6 md:right-6">

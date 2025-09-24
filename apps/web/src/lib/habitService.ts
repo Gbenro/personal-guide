@@ -732,6 +732,48 @@ export async function restoreHabit(habitId: string): Promise<boolean> {
   }
 }
 
+// Delete a habit (alias for archiveHabit for compatibility)
+export async function deleteHabit(habitId: string): Promise<boolean> {
+  return await archiveHabit(habitId)
+}
+
+// Toggle habit completion (mark as complete if not done today, undo if already done)
+export async function toggleHabitCompletion(habitId: string, userId: string): Promise<boolean> {
+  try {
+    // Check if habit was already completed today
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const { data: existingCompletion, error: checkError } = await supabase
+      .from('habit_completions')
+      .select('id')
+      .eq('habit_id', habitId)
+      .eq('user_id', userId)
+      .gte('completed_at', today.toISOString())
+      .lt('completed_at', tomorrow.toISOString())
+      .single()
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error('Error checking existing completion:', checkError)
+      return false
+    }
+
+    if (existingCompletion) {
+      // Already completed today, so undo it
+      return await undoHabitCompletion(habitId, userId)
+    } else {
+      // Not completed today, so complete it
+      const result = await completeHabit(habitId, userId)
+      return result !== null
+    }
+  } catch (error) {
+    console.error('Error in toggleHabitCompletion:', error)
+    return false
+  }
+}
+
 // Hard delete a habit (permanent removal)
 export async function deleteHabitPermanently(habitId: string): Promise<boolean> {
   try {
