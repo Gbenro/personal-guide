@@ -7,6 +7,7 @@ AI-powered personal assistance application helping users with productivity, know
 - **Archon OS**: Knowledge management and project memory (http://localhost:3737)
 - **BMAD**: Structured development methodology with specialized agents
 - **Claude Code**: AI-powered development assistance
+- **GitHub**: Version control and repository management (username: gbenro)
 
 ## Available BMAD Agents
 Use with `*` prefix:
@@ -49,7 +50,7 @@ Use with `*` prefix:
   CRITICAL BUG FIX - ALL DEVELOPMENT MUST FOLLOW THIS PROCESS:
 
   ## Task Status Pipeline (MANDATORY):
-  1. **BEFORE** starting work: Move Archon task from `todo` → `doing`
+  1. **BEFORE** starting work: Check current status, Move from `staged`/`todo` → `doing`
   2. **DURING** development: Update task with progress notes
   3. **AFTER** completion: Move task from `doing` → `review`
   4. **AFTER** verification: Move task from `review` → `done`
@@ -57,6 +58,8 @@ Use with `*` prefix:
   ## Implementation Enforcement:
   - ❌ NO development without updating Archon task status
   - ❌ NO completion claims without task in `review`/`done`
+  - ✅ ALWAYS check task status BEFORE starting work
+  - ✅ ALWAYS check task status AFTER completing work
   - ✅ ALWAYS sync implementation status with Archon
   - ✅ ALWAYS verify task status before claiming completion
 
@@ -65,6 +68,7 @@ Use with `*` prefix:
   - Update task status IMMEDIATELY when changing phases
   - Document implementation details in task notes
   - Verify Archon reflects reality before reporting completion
+  - NEVER leave tasks in incorrect pipeline status after work
 
 # Enhanced Orchestration System
 
@@ -139,3 +143,31 @@ All major technical choices are now tracked:
 - Enhanced orchestrator replaces old version
 - All existing agents still work the same way
 - New orchestration features are additive
+
+## GitHub Integration Setup
+
+### Authentication Configuration
+- **GitHub CLI**: Installed at `~/.local/bin/gh` (v2.80.0)
+- **Git Credentials**: Configured with token-based authentication
+- **Username**: gbenro
+- **Access**: Full repository access configured for agents
+
+### Available GitHub Operations
+All agents (architect, bmad-orchestrator, etc.) can now perform:
+- Repository cloning and management
+- Pull request creation and management
+- Issue tracking and management
+- Release management
+- Repository information retrieval
+
+### Usage Examples
+```bash
+# Create pull request
+gh pr create --title "Feature: Add new component" --body "Description"
+
+# Check repository status
+gh repo view
+
+# Manage issues
+gh issue create --title "Bug: Description"
+```
