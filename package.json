@@ -37,6 +37,11 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.62.0"
+    "@anthropic-ai/sdk": "^0.62.0",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/pg": "^8.15.5",
+    "bcryptjs": "^3.0.2",
+    "next-auth": "^4.24.11",
+    "pg": "^8.16.3"
   }
 }
