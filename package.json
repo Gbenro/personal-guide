@@ -38,6 +38,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.62.0",
+    "@auth/pg-adapter": "^1.10.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/pg": "^8.15.5",
     "bcryptjs": "^3.0.2",

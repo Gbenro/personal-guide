@@ -1,14 +1,15 @@
 // NextAuth configuration for Railway PostgreSQL
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { PostgresAdapter } from '@auth/pg-adapter'
 // Direct PostgreSQL import for server-side API routes
 import { Pool } from 'pg'
+import bcrypt from 'bcryptjs'
 
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 })
-import bcrypt from 'bcryptjs'
 
 export interface User {
   id: string
@@ -18,6 +19,7 @@ export interface User {
 }
 
 export const authOptions: NextAuthOptions = {
+  adapter: PostgresAdapter(db),
   providers: [
     CredentialsProvider({
       name: 'credentials',
