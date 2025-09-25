@@ -1,12 +1,16 @@
-import { Pool } from 'pg'
+// Database connection (server-side only)
+let db: any = null
 
-// Railway PostgreSQL connection (server-side only)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-})
+// Only initialize PostgreSQL on server-side
+if (typeof window === 'undefined') {
+  const { Pool } = require('pg')
+  db = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  })
+}
 
-export const db = pool
+export { db }
 
 // TEMPORARY: Legacy supabase export for build compatibility
 // TODO: Migrate all service files to use PostgreSQL directly
