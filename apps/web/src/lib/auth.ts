@@ -1,5 +1,5 @@
 // NextAuth configuration for Railway PostgreSQL
-import { NextAuthOptions } from 'next-auth'
+import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { db } from './supabase'
 import bcrypt from 'bcryptjs'
