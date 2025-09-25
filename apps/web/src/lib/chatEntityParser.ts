@@ -116,11 +116,17 @@ const ENTITY_PATTERNS = {
   ],
   belief: [
     /\b(?:belief|value|principle|mindset)\b/i,
-    /\b(?:core\s+belief|limiting\s+belief)\b/i
+    /\b(?:core\s+belief|limiting\s+belief)\b/i,
+    /\b(?:i\s+believe|i\s+am|i\s+can|i\s+have)\b/i,
+    /\b(?:affirmation|mantra|statement)\b/i,
+    /\b(?:reinforce|strengthen|challenge)\s+(?:belief|mindset)\b/i
   ],
   synchronicity: [
-    /\b(?:synchronicity|sign|pattern|symbol)\b/i,
-    /\b(?:meaningful\s+coincidence)\b/i
+    /\b(?:synchronicity|sign|pattern|symbol|synch)\b/i,
+    /\b(?:meaningful\s+coincidence|coincidence)\b/i,
+    /\blog\s+(?:synchronicity|synch|sign)\b/i,
+    /\b(?:amazing|incredible)\s+(?:synchronicity|sign|coincidence)\b/i,
+    /\b(?:11:?11|222|333|444|555|777|888|999)\b/i // Angel numbers
   ]
 }
 
@@ -143,7 +149,11 @@ const PARAMETER_EXTRACTION_RULES: Record<string, ExtractionRule> = {
       /(?:habit|routine|practice)\s+(?:called|named|for)\s+([\w\s]+?)(?:\s+(?:daily|weekly|monthly|every)|$)/i,
       /(?:add|create|new)\s+(?:a\s+)?(?:habit|routine|practice)\s+["']([^"']+)["']/i,
       /(?:add|create|new)\s+(?:a\s+)?(?:habit|routine|practice)\s+([\w\s]+?)(?:\s+(?:daily|weekly|monthly|every)|$)/i,
-      /["']([^"']+)["']\s+(?:habit|routine|practice)/i
+      /["']([^"']+)["']\s+(?:habit|routine|practice)/i,
+      // Routine-specific name patterns
+      /(?:create|add|new)\s+([\w\s]+?)\s+routine(?:\s*:)?/i,
+      /\b(morning|evening|bedtime|workout|study|work)\s+routine\b/i,
+      /([\w\s]+)\s+routine(?:\s*:|\s+including|\s+with)/i
     ],
     transformer: (value: string) => value.trim(),
     validator: (value: string) => value.length > 0 && value.length < 100,
@@ -299,9 +309,23 @@ const PARAMETER_EXTRACTION_RULES: Record<string, ExtractionRule> = {
     patterns: [
       /(?:category|type)\s+(?:of\s+|is\s+)?["']([^"']+)["']/i,
       /(?:category|type)\s+(?:of\s+|is\s+)?([\w]+)/i,
-      /(?:for|in)\s+(health|fitness|work|personal|spiritual|financial|social|learning|creative)/i
+      /(?:for|in)\s+(health|fitness|work|personal|spiritual|financial|social|learning|creative)/i,
+      // Routine-specific category patterns
+      /\b(morning|evening|bedtime)\s+routine\b/i,
+      /\b(workout|exercise|fitness)\s+routine\b/i,
+      /\b(meditation|mindfulness|spiritual)\s+routine\b/i,
+      /\b(work|productivity|study)\s+routine\b/i
     ],
-    transformer: (value: string) => value.toLowerCase().trim(),
+    transformer: (value: string) => {
+      const normalized = value.toLowerCase().trim()
+      // Map routine types to categories
+      if (['morning', 'evening', 'bedtime'].includes(normalized)) return 'sleep'
+      if (['workout', 'exercise', 'fitness'].includes(normalized)) return 'fitness'
+      if (['meditation', 'mindfulness', 'spiritual'].includes(normalized)) return 'wellness'
+      if (['work', 'productivity', 'study'].includes(normalized)) return 'productivity'
+      if (['health', 'fitness', 'exercise', 'wellness'].includes(normalized)) return 'health'
+      return normalized
+    },
     validator: (value: string) => value.length > 0 && value.length < 50,
     confidence: 0.7
   },
@@ -318,6 +342,140 @@ const PARAMETER_EXTRACTION_RULES: Record<string, ExtractionRule> = {
       return value.split(/[,\s]+/).map(tag => tag.replace('#', '').trim()).filter(tag => tag.length > 0)
     },
     validator: (value: string[]) => Array.isArray(value) && value.length > 0,
+    confidence: 0.8
+  },
+
+  // Routine-specific parameters
+  routine_type: {
+    patterns: [
+      /(?:routine\s+type|type\s+of\s+routine)\s+(?:is\s+)?(daily|weekly|monthly|custom)/i,
+      /\b(morning|evening|workout|bedtime|study|work|meditation)\s+routine\b/i,
+      /\b(daily|weekly|monthly)\s+routine\b/i
+    ],
+    transformer: (value: string) => {
+      const normalized = value.toLowerCase()
+      if (['morning', 'evening', 'bedtime'].includes(normalized)) return 'daily'
+      if (['workout', 'study', 'work', 'meditation'].includes(normalized)) return 'wellness'
+      return normalized
+    },
+    validator: (value: string) => ['daily', 'weekly', 'monthly', 'wellness', 'custom'].includes(value),
+    confidence: 0.85
+  },
+
+  steps: {
+    patterns: [
+      /(?:steps?|tasks?):\s*(.+?)(?:\n|$)/i,
+      /(?:including|involves|contains):\s*(.+?)(?:\n|$)/i,
+      /(?:routine|schedule)\s+(?:of|with):\s*(.+?)(?:\n|$)/i
+    ],
+    transformer: (value: string) => {
+      return value.split(/[,;]/).map(step => step.trim()).filter(step => step.length > 0)
+    },
+    validator: (value: string[]) => Array.isArray(value) && value.length > 0,
+    confidence: 0.8
+  },
+
+  estimated_duration: {
+    patterns: [
+      /(?:takes?|duration|lasts?|time)\s+(?:about\s+)?(\d+)\s+(?:minutes?|mins?)/i,
+      /(\d+)\s+(?:minute|min)\s+(?:routine|session|workout)/i,
+      /(?:for|in)\s+(\d+)\s+(?:minutes?|mins?)/i
+    ],
+    transformer: (value: string) => parseInt(value, 10),
+    validator: (value: number) => value > 0 && value <= 480, // Max 8 hours
+    confidence: 0.9
+  },
+
+  // Belief-specific parameters
+  statement: {
+    patterns: [
+      /(?:i\s+believe|belief)\s+(?:that\s+)?(.+?)(?:\.|$)/i,
+      /(?:i\s+am|i'm)\s+(.+?)(?:\.|$)/i,
+      /(?:affirmation|statement):\s*(.+?)(?:\.|$)/i,
+      /"([^"]+)"/i // Quoted statements
+    ],
+    transformer: (value: string) => value.trim().replace(/^that\s+/i, ''),
+    validator: (value: string) => value.length > 3 && value.length < 500,
+    confidence: 0.9
+  },
+
+  belief_type: {
+    patterns: [
+      /\b(?:i\s+am\s+(?:worthy|deserving|enough|capable|strong|confident|successful))/i,
+      /\b(?:i\s+can\s+(?:achieve|accomplish|succeed|do|handle|overcome))/i,
+      /\b(?:i\s+have\s+(?:abundance|wealth|health|love|support|strength))/i,
+      /\b(?:good\s+things|opportunities|success|love|abundance)\s+(?:come\s+to\s+me|flow\s+to\s+me)/i
+    ],
+    transformer: (value: string) => {
+      const normalized = value.toLowerCase()
+      if (/worthy|deserving|enough/.test(normalized)) return 'self_worth'
+      if (/capable|can|achieve|accomplish|succeed/.test(normalized)) return 'capability'
+      if (/abundance|wealth|money|prosperity/.test(normalized)) return 'abundance'
+      if (/health|strong|energy/.test(normalized)) return 'health'
+      if (/love|relationship|connection/.test(normalized)) return 'relationships'
+      return 'general'
+    },
+    validator: (value: string) => ['self_worth', 'capability', 'abundance', 'health', 'relationships', 'general'].includes(value),
+    confidence: 0.8
+  },
+
+  action: {
+    patterns: [
+      /(?:reinforce|strengthen|affirm|practice)\s+(?:my\s+)?belief/i,
+      /(?:challenge|question|examine)\s+(?:my\s+)?belief/i,
+      /(?:complete|finish|done)\s+(?:my\s+)?(?:routine|goal|task)/i
+    ],
+    transformer: (value: string) => {
+      const normalized = value.toLowerCase()
+      if (/reinforce|strengthen|affirm|practice/.test(normalized)) return 'reinforce'
+      if (/challenge|question|examine/.test(normalized)) return 'challenge'
+      if (/complete|finish|done/.test(normalized)) return 'complete'
+      return normalized
+    },
+    validator: (value: string) => ['reinforce', 'challenge', 'complete', 'update'].includes(value),
+    confidence: 0.9
+  },
+
+  // Synchronicity-specific parameters
+  significance: {
+    patterns: [
+      /(?:significance|important|meaningful)\s+(?:level\s+)?(?:of\s+)?(\d+)(?:\/10|\s+out\s+of\s+10)?/i,
+      /(\d+)\/10\s+(?:significance|important|meaningful)/i,
+      /(?:very|extremely|highly)\s+(?:significant|meaningful|important)/i,
+      /(?:amazing|incredible|powerful)\s+(?:synchronicity|sign|coincidence)/i
+    ],
+    transformer: (value: string | number) => {
+      if (typeof value === 'number') return value
+      const normalized = value.toLowerCase()
+      if (/very|extremely|highly|amazing|incredible|powerful/.test(normalized)) return 9
+      if (/significant|meaningful|important/.test(normalized)) return 7
+      return parseInt(String(value), 10) || 5
+    },
+    validator: (value: number) => value >= 1 && value <= 10,
+    confidence: 0.85
+  },
+
+  emotions: {
+    patterns: [
+      /(?:feeling|felt|emotions?)\s+([^.]+?)(?:\.|$)/i,
+      /(?:made\s+me\s+feel|i\s+feel)\s+([^.]+?)(?:\.|$)/i,
+      /(?:emotional\s+response|reaction):\s*([^.]+?)(?:\.|$)/i
+    ],
+    transformer: (value: string) => {
+      return value.split(/[,&]/).map(emotion => emotion.trim()).filter(emotion => emotion.length > 0)
+    },
+    validator: (value: string[]) => Array.isArray(value) && value.length > 0,
+    confidence: 0.8
+  },
+
+  context: {
+    patterns: [
+      /(?:context|situation|circumstances?):\s*(.+?)(?:\n|$)/i,
+      /(?:happened\s+when|occurred\s+while|during)\s+(.+?)(?:\.|$)/i,
+      /(?:i\s+was)\s+(.+?)(?:\s+when|\s+and)/i
+    ],
+    transformer: (value: string) => value.trim(),
+    validator: (value: string) => value.length > 3 && value.length < 500,
     confidence: 0.8
   }
 }
@@ -371,7 +529,7 @@ const ACTION_KEYWORDS = {
 // =============================================================================
 
 export class ChatEntityParser {
-  private confidenceThreshold = 0.75 // Raised for higher accuracy
+  private confidenceThreshold = 0.6 // Lowered for testing new patterns
   private debugMode = false
 
   /**

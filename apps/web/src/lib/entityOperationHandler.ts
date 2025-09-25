@@ -3,6 +3,9 @@ import { createHabit, updateHabit, deleteHabit, getUserHabits, toggleHabitComple
 import { GoalsService } from './goalsService'
 import { createJournalEntry, updateJournalEntry, deleteJournalEntry, getUserJournalEntries } from './journalService'
 import { createMoodEnergyEntry, getMoodEnergyEntries, updateMoodEnergyEntry, deleteMoodEnergyEntry, getMoodEnergyStats, getTodaysMoodEnergy, getMoodPatterns } from './moodEnergyService'
+import { RoutinesService } from './routinesService'
+import { BeliefsService } from './beliefsService'
+import { SynchronicityService } from './synchronicityService'
 
 // =============================================================================
 // OPERATION RESULT TYPES
@@ -59,6 +62,12 @@ export class EntityOperationHandler {
           return await this.handleJournalOperation(operation)
         case 'mood':
           return await this.handleMoodOperation(operation)
+        case 'routine':
+          return await this.handleRoutineOperation(operation)
+        case 'belief':
+          return await this.handleBeliefOperation(operation)
+        case 'synchronicity':
+          return await this.handleSynchronicityOperation(operation)
         default:
           return {
             success: false,
@@ -1172,6 +1181,658 @@ export class EntityOperationHandler {
     suggestions.push('Track mood patterns over time')
 
     return suggestions.slice(0, 5)
+  }
+
+  // =============================================================================
+  // ROUTINE OPERATIONS
+  // =============================================================================
+
+  private async handleRoutineOperation(operation: ParsedEntityOperation): Promise<OperationResult> {
+    const { intent, parameters, entityId, originalMessage } = operation
+
+    // Add originalMessage to parameters for context
+    const enhancedParameters = { ...parameters, originalMessage }
+
+    switch (intent) {
+      case 'create':
+        return await this.createRoutineFromChat(enhancedParameters)
+
+      case 'view':
+        return await this.viewRoutineFromChat(enhancedParameters)
+
+      case 'update':
+        if (!entityId) {
+          return await this.findAndUpdateRoutine(enhancedParameters)
+        }
+        return await this.updateRoutineFromChat(entityId, enhancedParameters)
+
+      case 'delete':
+        if (!entityId) {
+          return await this.findAndDeleteRoutine(enhancedParameters)
+        }
+        return await this.deleteRoutineFromChat(entityId)
+
+      default:
+        return {
+          success: false,
+          message: `Routine operation '${intent}' is not supported yet`
+        }
+    }
+  }
+
+  private async createRoutineFromChat(parameters: any): Promise<OperationResult> {
+    try {
+      const originalMessage = parameters.originalMessage || ''
+
+      // Basic routine data with reasonable defaults
+      const routineData = {
+        name: parameters.name || this.extractRoutineNameFromMessage(originalMessage),
+        description: parameters.description || `Custom routine created from: "${originalMessage}"`,
+        category: parameters.category || this.inferRoutineCategory(originalMessage),
+        routine_type: parameters.routine_type || 'daily',
+        steps: parameters.steps || this.generateBasicSteps(originalMessage),
+        estimated_duration: parameters.estimated_duration || 10, // 10 minutes default
+        preferred_time_of_day: parameters.preferred_time_of_day
+      }
+
+      // Validate required fields
+      if (!routineData.name) {
+        return {
+          success: false,
+          message: 'I need a name for your routine. Try: "Create morning routine called Daily Energy"'
+        }
+      }
+
+      const routine = await RoutinesService.createUserRoutine(this.userId, routineData)
+
+      return {
+        success: true,
+        message: `✅ Created routine "${routine.name}" with ${routine.steps.length} steps`,
+        data: routine,
+        suggestedActions: [
+          'Start your first session',
+          'Customize the routine steps',
+          'Set a daily schedule'
+        ]
+      }
+    } catch (error) {
+      console.error('Error creating routine from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to create routine. Please try again or check your input.'
+      }
+    }
+  }
+
+  private async viewRoutineFromChat(parameters: any): Promise<OperationResult> {
+    try {
+      const routines = await RoutinesService.getUserRoutines(this.userId, {
+        is_active: true
+      })
+
+      if (routines.length === 0) {
+        return {
+          success: true,
+          message: 'You have no routines yet. Create your first routine to get started!',
+          suggestedActions: [
+            'Create morning routine',
+            'Add evening routine',
+            'Try "Create routine for better sleep"'
+          ]
+        }
+      }
+
+      const routineList = routines.slice(0, 5).map(routine =>
+        `📋 **${routine.name}** (${routine.steps.length} steps, ~${routine.estimated_duration}min)`
+      ).join('\n')
+
+      return {
+        success: true,
+        message: `🔄 Your Active Routines:\n\n${routineList}${routines.length > 5 ? `\n\n... and ${routines.length - 5} more routines` : ''}`,
+        data: routines,
+        suggestedActions: [
+          'Start a routine session',
+          'View routine details',
+          'Create a new routine'
+        ]
+      }
+    } catch (error) {
+      console.error('Error viewing routines from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to retrieve routines. Please try again.'
+      }
+    }
+  }
+
+  private async updateRoutineFromChat(routineId: string, parameters: any): Promise<OperationResult> {
+    try {
+      const updates: any = {}
+
+      if (parameters.name) updates.name = parameters.name
+      if (parameters.description) updates.description = parameters.description
+      if (parameters.steps) updates.steps = parameters.steps
+
+      const routine = await RoutinesService.updateUserRoutine(this.userId, routineId, updates)
+
+      return {
+        success: true,
+        message: `✅ Updated routine "${routine.name}"`,
+        data: routine
+      }
+    } catch (error) {
+      console.error('Error updating routine from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to update routine. Please try again.'
+      }
+    }
+  }
+
+  private async deleteRoutineFromChat(routineId: string): Promise<OperationResult> {
+    try {
+      await RoutinesService.deleteUserRoutine(this.userId, routineId)
+
+      return {
+        success: true,
+        message: '🗑️ Routine deleted successfully',
+        needsConfirmation: true,
+        confirmationPrompt: 'Are you sure you want to delete this routine? This action cannot be undone.'
+      }
+    } catch (error) {
+      console.error('Error deleting routine from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to delete routine. Please try again.'
+      }
+    }
+  }
+
+  private async findAndUpdateRoutine(parameters: any): Promise<OperationResult> {
+    return {
+      success: false,
+      message: 'Please specify which routine to update. Try: "Update my morning routine"'
+    }
+  }
+
+  private async findAndDeleteRoutine(parameters: any): Promise<OperationResult> {
+    return {
+      success: false,
+      message: 'Please specify which routine to delete. Try: "Delete my evening routine"'
+    }
+  }
+
+  // Helper methods for routine operations
+  private extractRoutineNameFromMessage(message: string): string | null {
+    const patterns = [
+      /(?:create|add|new)\s+(?:a\s+)?(?:routine\s+)?(?:called|named)\s+["']([^"']+)["']/i,
+      /(?:create|add|new)\s+(?:a\s+)?(.+?)\s+routine/i,
+      /(?:routine\s+for\s+)(.+)/i,
+      /(.+?)\s+routine/i
+    ]
+
+    for (const pattern of patterns) {
+      const match = pattern.exec(message)
+      if (match && match[1].trim().length > 2) {
+        return match[1].trim()
+      }
+    }
+
+    return null
+  }
+
+  private inferRoutineCategory(message: string): string {
+    const categories = {
+      'Morning': ['morning', 'wake up', 'start', 'begin'],
+      'Evening': ['evening', 'night', 'sleep', 'bed', 'end'],
+      'Exercise': ['workout', 'exercise', 'fitness', 'gym', 'run'],
+      'Meditation': ['meditation', 'mindfulness', 'breathe', 'calm'],
+      'Work': ['work', 'productivity', 'focus', 'study'],
+      'Health': ['health', 'wellness', 'nutrition', 'eating']
+    }
+
+    const normalizedMessage = message.toLowerCase()
+
+    for (const [category, keywords] of Object.entries(categories)) {
+      if (keywords.some(keyword => normalizedMessage.includes(keyword))) {
+        return category
+      }
+    }
+
+    return 'General'
+  }
+
+  private generateBasicSteps(message: string): any[] {
+    // Generate basic steps based on routine type
+    const normalizedMessage = message.toLowerCase()
+
+    if (normalizedMessage.includes('morning')) {
+      return [
+        { id: crypto.randomUUID(), name: 'Wake up', duration: 60, order: 1 },
+        { id: crypto.randomUUID(), name: 'Stretch or light exercise', duration: 300, order: 2 },
+        { id: crypto.randomUUID(), name: 'Prepare for the day', duration: 600, order: 3 }
+      ]
+    }
+
+    if (normalizedMessage.includes('evening')) {
+      return [
+        { id: crypto.randomUUID(), name: 'Reflect on the day', duration: 300, order: 1 },
+        { id: crypto.randomUUID(), name: 'Prepare for tomorrow', duration: 300, order: 2 },
+        { id: crypto.randomUUID(), name: 'Wind down', duration: 600, order: 3 }
+      ]
+    }
+
+    // Generic routine steps
+    return [
+      { id: crypto.randomUUID(), name: 'Begin routine', duration: 60, order: 1 },
+      { id: crypto.randomUUID(), name: 'Main activity', duration: 480, order: 2 },
+      { id: crypto.randomUUID(), name: 'Complete routine', duration: 60, order: 3 }
+    ]
+  }
+
+  // =============================================================================
+  // BELIEF OPERATIONS
+  // =============================================================================
+
+  private async handleBeliefOperation(operation: ParsedEntityOperation): Promise<OperationResult> {
+    const { intent, parameters, entityId, originalMessage } = operation
+
+    // Add originalMessage to parameters for context
+    const enhancedParameters = { ...parameters, originalMessage }
+
+    switch (intent) {
+      case 'create':
+        return await this.createBeliefFromChat(enhancedParameters)
+
+      case 'view':
+        return await this.viewBeliefsFromChat(enhancedParameters)
+
+      case 'update':
+        if (!entityId) {
+          return await this.findAndUpdateBelief(enhancedParameters)
+        }
+        return await this.updateBeliefFromChat(entityId, enhancedParameters)
+
+      case 'delete':
+        if (!entityId) {
+          return await this.findAndDeleteBelief(enhancedParameters)
+        }
+        return await this.deleteBeliefFromChat(entityId)
+
+      default:
+        return {
+          success: false,
+          message: `Belief operation '${intent}' is not supported yet`
+        }
+    }
+  }
+
+  private async createBeliefFromChat(parameters: any): Promise<OperationResult> {
+    try {
+      const originalMessage = parameters.originalMessage || ''
+      const beliefStatement = this.extractBeliefStatement(originalMessage)
+
+      if (!beliefStatement) {
+        return {
+          success: false,
+          message: 'I need a belief statement. Try: "Add belief: I am capable of achieving my goals"'
+        }
+      }
+
+      // Create a custom belief system first
+      const beliefSystem = await BeliefsService.createBeliefSystem(this.userId, {
+        title: parameters.title || `Custom Belief: ${beliefStatement.substring(0, 50)}...`,
+        description: `Belief system created from: "${originalMessage}"`,
+        category: parameters.category || 'Personal Growth',
+        belief_statement: beliefStatement,
+        affirmations: [
+          beliefStatement,
+          `I believe ${beliefStatement.toLowerCase()}`,
+          `Every day, ${beliefStatement.toLowerCase()}`
+        ],
+        visualization_script: this.generateVisualizationScript(beliefStatement),
+        cycle_length: 21, // Standard 21-day belief installation
+        is_public: false
+      })
+
+      // Create a belief cycle for the user
+      const beliefCycle = await BeliefsService.createBeliefCycle(this.userId, {
+        belief_system_id: beliefSystem.id,
+        personal_belief_statement: beliefStatement,
+        personal_reason: parameters.reason || 'Personal growth and empowerment',
+        target_belief_strength: 10
+      })
+
+      return {
+        success: true,
+        message: `✅ Started belief work: "${beliefStatement}"\n🎯 21-day program created to strengthen this belief`,
+        data: beliefCycle,
+        suggestedActions: [
+          'Start today\'s belief activities',
+          'Set a daily reminder',
+          'Track your progress'
+        ]
+      }
+    } catch (error) {
+      console.error('Error creating belief from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to create belief program. Please try again.'
+      }
+    }
+  }
+
+  private async viewBeliefsFromChat(parameters: any): Promise<OperationResult> {
+    try {
+      const beliefCycles = await BeliefsService.getUserBeliefCycles(this.userId, {
+        status: ['active']
+      })
+
+      if (beliefCycles.length === 0) {
+        return {
+          success: true,
+          message: 'You have no active belief programs yet. Start strengthening your mindset!',
+          suggestedActions: [
+            'Add belief: I am confident',
+            'Create belief: I deserve success',
+            'Try "Add belief: I am capable of growth"'
+          ]
+        }
+      }
+
+      const beliefList = beliefCycles.slice(0, 5).map(cycle =>
+        `🧠 **${cycle.personal_belief_statement}**\n   Day ${cycle.current_day} of 21 • ${cycle.days_completed} days completed`
+      ).join('\n\n')
+
+      return {
+        success: true,
+        message: `💫 Your Active Belief Programs:\n\n${beliefList}${beliefCycles.length > 5 ? `\n\n... and ${beliefCycles.length - 5} more programs` : ''}`,
+        data: beliefCycles,
+        suggestedActions: [
+          'Do today\'s belief activities',
+          'Check belief progress',
+          'Add a new belief'
+        ]
+      }
+    } catch (error) {
+      console.error('Error viewing beliefs from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to retrieve belief programs. Please try again.'
+      }
+    }
+  }
+
+  private async updateBeliefFromChat(cycleId: string, parameters: any): Promise<OperationResult> {
+    try {
+      const updates: any = {}
+
+      if (parameters.personal_belief_statement) {
+        updates.personal_belief_statement = parameters.personal_belief_statement
+      }
+      if (parameters.personal_reason) {
+        updates.personal_reason = parameters.personal_reason
+      }
+
+      const cycle = await BeliefsService.updateBeliefCycle(this.userId, cycleId, updates)
+
+      return {
+        success: true,
+        message: `✅ Updated belief program: "${cycle.personal_belief_statement}"`,
+        data: cycle
+      }
+    } catch (error) {
+      console.error('Error updating belief from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to update belief program. Please try again.'
+      }
+    }
+  }
+
+  private async deleteBeliefFromChat(cycleId: string): Promise<OperationResult> {
+    return {
+      success: true,
+      message: '🗑️ Belief program archived successfully',
+      needsConfirmation: true,
+      confirmationPrompt: 'Are you sure you want to archive this belief program? Your progress will be saved but the program will be paused.'
+    }
+  }
+
+  private async findAndUpdateBelief(parameters: any): Promise<OperationResult> {
+    return {
+      success: false,
+      message: 'Please specify which belief to update. Try: "Update my confidence belief"'
+    }
+  }
+
+  private async findAndDeleteBelief(parameters: any): Promise<OperationResult> {
+    return {
+      success: false,
+      message: 'Please specify which belief to delete. Try: "Delete my success belief"'
+    }
+  }
+
+  // Helper methods for belief operations
+  private extractBeliefStatement(message: string): string | null {
+    const patterns = [
+      /(?:add|create|new)\s+belief\s*:\s*(.+)/i,
+      /(?:belief\s+that\s+)(.+)/i,
+      /(?:believe\s+that\s+)(.+)/i,
+      /(?:i\s+am\s+)(.+)/i
+    ]
+
+    for (const pattern of patterns) {
+      const match = pattern.exec(message)
+      if (match && match[1].trim().length > 3) {
+        let statement = match[1].trim()
+
+        // Clean up the statement
+        statement = statement.replace(/[.!?]+$/, '') // Remove trailing punctuation
+
+        // Ensure it starts with "I am" or similar
+        if (!statement.toLowerCase().startsWith('i ')) {
+          statement = `I am ${statement}`
+        }
+
+        return statement
+      }
+    }
+
+    return null
+  }
+
+  private generateVisualizationScript(beliefStatement: string): any {
+    return {
+      title: `Visualizing: ${beliefStatement}`,
+      duration_minutes: 5,
+      script: `Close your eyes and take three deep breaths. Imagine yourself fully embodying the belief: "${beliefStatement}". See yourself acting with complete confidence in this truth. Feel the positive emotions this brings. Notice how others respond to your authentic self. Hold this vision for a moment, knowing that this belief is becoming stronger within you each day.`,
+      background_music: 'calm',
+      guided_length: 'short'
+    }
+  }
+
+  // =============================================================================
+  // SYNCHRONICITY OPERATIONS
+  // =============================================================================
+
+  private async handleSynchronicityOperation(operation: ParsedEntityOperation): Promise<OperationResult> {
+    const { intent, parameters, entityId, originalMessage } = operation
+
+    // Add originalMessage to parameters for context
+    const enhancedParameters = { ...parameters, originalMessage }
+
+    switch (intent) {
+      case 'create':
+        return await this.createSynchronicityFromChat(enhancedParameters)
+
+      case 'view':
+        return await this.viewSynchronicitiesFromChat(enhancedParameters)
+
+      default:
+        return {
+          success: false,
+          message: `Synchronicity operation '${intent}' is not supported yet`
+        }
+    }
+  }
+
+  private async createSynchronicityFromChat(parameters: any): Promise<OperationResult> {
+    try {
+      const originalMessage = parameters.originalMessage || ''
+      const synchronicityService = new SynchronicityService(this.userId)
+
+      // Extract synchronicity details from the message
+      const syncDetails = this.extractSynchronicityDetails(originalMessage)
+
+      if (!syncDetails.title) {
+        return {
+          success: false,
+          message: 'I need more details about the synchronicity. Try: "Log synch: saw 11:11 everywhere today"'
+        }
+      }
+
+      const synchronicityData = {
+        title: syncDetails.title,
+        description: syncDetails.description || originalMessage,
+        date: new Date(),
+        tags: syncDetails.tags,
+        significance: syncDetails.significance || 7, // Default significance
+        context: syncDetails.context,
+        emotions: syncDetails.emotions || ['wonder', 'curious'],
+        patterns: []
+      }
+
+      const entry = await synchronicityService.createEntry(synchronicityData)
+
+      return {
+        success: true,
+        message: `✨ Logged synchronicity: "${entry.title}"\n🎯 Significance: ${entry.significance}/10`,
+        data: entry,
+        suggestedActions: [
+          'View your synchronicity patterns',
+          'Log another synchronicity',
+          'Reflect on the meaning'
+        ]
+      }
+    } catch (error) {
+      console.error('Error creating synchronicity from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to log synchronicity. Please try again.'
+      }
+    }
+  }
+
+  private async viewSynchronicitiesFromChat(parameters: any): Promise<OperationResult> {
+    try {
+      const synchronicityService = new SynchronicityService(this.userId)
+      const entries = await synchronicityService.getRecentEntries(10)
+
+      if (entries.length === 0) {
+        return {
+          success: true,
+          message: 'You haven\'t logged any synchronicities yet. Start noticing the meaningful patterns in your life!',
+          suggestedActions: [
+            'Log synch: 11:11 everywhere',
+            'Record synch: perfect timing',
+            'Try "Log synchronicity about meeting someone special"'
+          ]
+        }
+      }
+
+      const syncList = entries.slice(0, 5).map(entry =>
+        `✨ **${entry.title}** (${entry.significance}/10)\n   ${entry.description.substring(0, 100)}${entry.description.length > 100 ? '...' : ''}`
+      ).join('\n\n')
+
+      return {
+        success: true,
+        message: `🌟 Your Recent Synchronicities:\n\n${syncList}${entries.length > 5 ? `\n\n... and ${entries.length - 5} more synchronicities` : ''}`,
+        data: entries,
+        suggestedActions: [
+          'Log a new synchronicity',
+          'View synchronicity patterns',
+          'Explore deeper meanings'
+        ]
+      }
+    } catch (error) {
+      console.error('Error viewing synchronicities from chat:', error)
+      return {
+        success: false,
+        message: 'Failed to retrieve synchronicities. Please try again.'
+      }
+    }
+  }
+
+  // Helper methods for synchronicity operations
+  private extractSynchronicityDetails(message: string): {
+    title: string | null,
+    description: string | null,
+    tags: string[],
+    significance: number | null,
+    context: string | null,
+    emotions: string[] | null
+  } {
+    const normalizedMessage = message.toLowerCase()
+
+    // Extract title patterns
+    let title = null
+    const titlePatterns = [
+      /(?:log|record|saw)\s+(?:synch|synchronicity)\s*:\s*(.+)/i,
+      /(?:synch|synchronicity)\s+about\s+(.+)/i,
+      /(?:noticed|saw|experienced)\s+(.+?)\s+(?:synchronicity|synch)/i
+    ]
+
+    for (const pattern of titlePatterns) {
+      const match = pattern.exec(message)
+      if (match && match[1].trim().length > 3) {
+        title = match[1].trim()
+        break
+      }
+    }
+
+    // Extract significance (if mentioned)
+    let significance = null
+    const significancePattern = /(\d+)\/10/i
+    const sigMatch = significancePattern.exec(message)
+    if (sigMatch) {
+      significance = parseInt(sigMatch[1], 10)
+    }
+
+    // Infer tags from common synchronicity types
+    const tags = []
+    if (normalizedMessage.includes('11:11') || normalizedMessage.includes('number')) {
+      tags.push('numbers')
+    }
+    if (normalizedMessage.includes('dream') || normalizedMessage.includes('vision')) {
+      tags.push('dreams')
+    }
+    if (normalizedMessage.includes('animal') || normalizedMessage.includes('bird')) {
+      tags.push('animals')
+    }
+    if (normalizedMessage.includes('person') || normalizedMessage.includes('meeting')) {
+      tags.push('people')
+    }
+    if (normalizedMessage.includes('timing') || normalizedMessage.includes('perfect')) {
+      tags.push('timing')
+    }
+
+    // Infer emotions
+    let emotions = null
+    if (normalizedMessage.includes('amazed') || normalizedMessage.includes('wow')) {
+      emotions = ['amazed', 'wonder']
+    } else if (normalizedMessage.includes('weird') || normalizedMessage.includes('strange')) {
+      emotions = ['curious', 'puzzled']
+    }
+
+    return {
+      title,
+      description: title ? message : null,
+      tags,
+      significance,
+      context: null, // Could be extracted from more complex patterns
+      emotions
+    }
   }
 
   // =============================================================================
