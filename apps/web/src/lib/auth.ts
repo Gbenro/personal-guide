@@ -1,7 +1,13 @@
 // NextAuth configuration for Railway PostgreSQL
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { db } from './supabase'
+// Direct PostgreSQL import for server-side API routes
+import { Pool } from 'pg'
+
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+})
 import bcrypt from 'bcryptjs'
 
 export interface User {
