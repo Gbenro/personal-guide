@@ -3,9 +3,22 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { Pool } from 'pg'
 
+console.log('🚀 Initializing database connection...')
+console.log('NODE_ENV:', process.env.NODE_ENV)
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL)
+
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+})
+
+// Test database connection
+db.on('connect', () => {
+  console.log('✅ Database connected successfully')
+})
+
+db.on('error', (err) => {
+  console.error('❌ Database connection error:', err)
 })
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-fallback-secret-key'
@@ -41,6 +54,9 @@ export function verifyToken(token: string): User | null {
 
 // Create user
 export async function createUser(email: string, password: string, fullName?: string) {
+  console.log('🔐 Creating user:', { email, fullName, hasPassword: !!password })
+  console.log('🗃️ Database URL available:', !!process.env.DATABASE_URL)
+
   const hashedPassword = await bcrypt.hash(password, 12)
 
   const result = await db.query(

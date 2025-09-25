@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createUser, signToken } from '@/lib/simple-auth'
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 Simple signup route called')
   try {
-    const { email, password, fullName } = await request.json()
+    const body = await request.json()
+    console.log('📝 Signup request body:', { email: body.email, hasPassword: !!body.password, fullName: body.fullName })
+    const { email, password, fullName } = body
 
     if (!email || !password) {
       return NextResponse.json(
