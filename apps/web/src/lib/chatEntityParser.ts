@@ -51,12 +51,22 @@ const INTENT_PATTERNS = {
   create: [
     /^(?:create|add|new|start|begin)\s+(?:a\s+)?(.+)/i,
     /^(?:i\s+want\s+to\s+)?(?:create|add|start)\s+(.+)/i,
-    /^(?:let's\s+)?(?:create|add|make)\s+(.+)/i
+    /^(?:let's\s+)?(?:create|add|make)\s+(.+)/i,
+    // Belief creation patterns
+    /^(?:i\s+believe|i\s+am|i\s+can|i\s+have|i\s+will)\s+(.+)/i,
+    /^(?:belief|affirmation|statement)\s*:\s*(.+)/i,
+    // Synchronicity logging patterns
+    /^(?:log|record|note)\s+(?:synchronicity|synch|sign)\s*:?\s*(.+)/i,
+    /^(?:amazing|incredible|wow|powerful)\s+(?:synchronicity|sign|coincidence)/i,
+    /^(?:synchronicity|synch)\s*!\s*(.+)/i
   ],
   update: [
     /^(?:update|edit|change|modify)\s+(.+)/i,
     /^(?:i\s+want\s+to\s+)?(?:update|edit|change)\s+(.+)/i,
-    /^(?:can\s+you\s+)?(?:update|edit|change)\s+(.+)/i
+    /^(?:can\s+you\s+)?(?:update|edit|change)\s+(.+)/i,
+    // Belief reinforcement patterns
+    /^(?:reinforce|strengthen|affirm|practice)\s+(?:belief|mindset)\s*:?\s*(.+)/i,
+    /^(?:challenge|question|examine)\s+(?:belief|mindset)\s*:?\s*(.+)/i
   ],
   delete: [
     /^(?:delete|remove|cancel|stop)\s+(.+)/i,
@@ -166,7 +176,11 @@ const PARAMETER_EXTRACTION_RULES: Record<string, ExtractionRule> = {
       /(?:goal|objective|target)\s+(?:to|of)\s+([\w\s]+?)(?:\s+(?:by|before|until)|$)/i,
       /(?:add|create|new)\s+(?:a\s+)?goal\s+["']([^"']+)["']/i,
       /(?:add|create|new)\s+(?:a\s+)?goal\s+(?:to\s+)?([\w\s]+?)(?:\s+(?:by|before|until)|$)/i,
-      /["']([^"']+)["']\s+goal/i
+      /["']([^"']+)["']\s+goal/i,
+      // Synchronicity title patterns
+      /(?:log|record)\s+(?:synchronicity|synch|sign)\s*:\s*(.+?)(?:\s+(?:saw|met|happened)|$)/i,
+      /(?:synchronicity|synch)\s*!\s*(.+?)(?:\s+(?:happened|occurred)|$)/i,
+      /(?:amazing|incredible)\s+(?:synchronicity|sign|coincidence)\s*:?\s*(.+?)(?:\.|$)/i
     ],
     transformer: (value: string) => value.trim(),
     validator: (value: string) => value.length > 0 && value.length < 200,

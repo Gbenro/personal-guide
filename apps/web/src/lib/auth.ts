@@ -19,7 +19,6 @@ export interface User {
 }
 
 export const authOptions: NextAuthOptions = {
-  // adapter: PostgresAdapter(db), // Temporarily disabled for build
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -56,11 +55,28 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
-  session: { strategy: 'jwt' },
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (token.id) {
+        session.user.id = token.id as string
+      }
+      return session
+    },
+  },
   pages: {
     signIn: '/auth/signin',
-    signUp: '/auth/signup'
-  }
+  },
+  secret: process.env.NEXTAUTH_SECRET,
 }
 
 export async function createUser(email: string, password: string, fullName?: string) {
