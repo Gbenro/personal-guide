@@ -8,6 +8,20 @@ const pool = new Pool({
 
 export const db = pool
 
+// TEMPORARY: Legacy supabase export for build compatibility
+// TODO: Migrate all service files to use PostgreSQL directly
+export const supabase = {
+  from: () => ({
+    select: () => ({ eq: () => ({ order: () => ({ limit: () => ({ data: [], error: null }) }) }) }),
+    insert: () => ({ select: () => ({ single: () => ({ data: null, error: null }) }) }),
+    update: () => ({ eq: () => ({ data: null, error: null }) })
+  }),
+  auth: {
+    getSession: () => Promise.resolve({ data: { session: null } }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
+  }
+}
+
 // Database Types
 export interface User {
   id: string

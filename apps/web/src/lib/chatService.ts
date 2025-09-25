@@ -1,5 +1,5 @@
-import { supabase } from './supabase'
-import type { User } from '@supabase/supabase-js'
+import { db } from './supabase'
+import type { User } from './auth'
 
 export interface ChatMessage {
   id: string
