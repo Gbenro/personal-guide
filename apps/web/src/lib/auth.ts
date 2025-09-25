@@ -19,7 +19,7 @@ export interface User {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PostgresAdapter(db),
+  // adapter: PostgresAdapter(db), // Temporarily disabled - causing 502 errors
   providers: [
     CredentialsProvider({
       name: 'credentials',
