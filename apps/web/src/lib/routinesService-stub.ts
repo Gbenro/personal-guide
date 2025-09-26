@@ -1,5 +1,42 @@
-// Temporary stub for routines service to prevent Supabase errors
+// Enhanced stub for routines service with localStorage persistence
 // TODO: Replace with full PostgreSQL implementation
+
+// Simple localStorage-based storage for routines
+class RoutineStorage {
+  private static ROUTINES_KEY = 'pg_user_routines'
+  private static TEMPLATES_KEY = 'pg_routine_templates'
+  private static SESSIONS_KEY = 'pg_routine_sessions'
+
+  static getUserRoutines(userId: string): UserRoutine[] {
+    try {
+      const routines = localStorage.getItem(`${this.ROUTINES_KEY}_${userId}`)
+      return routines ? JSON.parse(routines) : []
+    } catch (error) {
+      console.warn('Failed to load routines from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveUserRoutines(userId: string, routines: UserRoutine[]): void {
+    try {
+      localStorage.setItem(`${this.ROUTINES_KEY}_${userId}`, JSON.stringify(routines))
+    } catch (error) {
+      console.warn('Failed to save routines to localStorage:', error)
+    }
+  }
+
+  static addUserRoutine(userId: string, routine: UserRoutine): void {
+    const existingRoutines = this.getUserRoutines(userId)
+    const updatedRoutines = [...existingRoutines, routine]
+    this.saveUserRoutines(userId, updatedRoutines)
+  }
+
+  static removeUserRoutine(userId: string, routineId: string): void {
+    const existingRoutines = this.getUserRoutines(userId)
+    const updatedRoutines = existingRoutines.filter(r => r.id !== routineId)
+    this.saveUserRoutines(userId, updatedRoutines)
+  }
+}
 
 import type {
   RoutineTemplate,
@@ -85,13 +122,54 @@ export class RoutinesService {
   // ============================================================================
 
   static async getUserRoutines(userId: string, filters: RoutineFilters = {}): Promise<UserRoutine[]> {
-    console.log('Get user routines stub called - returning empty routines')
-    return []
+    console.log('🔥 [ENHANCED STUB] getUserRoutines called for userId:', userId)
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, returning empty array')
+      return []
+    }
+
+    const routines = RoutineStorage.getUserRoutines(userId)
+    console.log(`Found ${routines.length} routines for user`)
+
+    // Apply basic filtering
+    let filteredRoutines = routines
+
+    if (filters.category?.length) {
+      filteredRoutines = filteredRoutines.filter(r => filters.category!.includes(r.category))
+    }
+
+    if (filters.routine_type?.length) {
+      filteredRoutines = filteredRoutines.filter(r => filters.routine_type!.includes(r.routine_type))
+    }
+
+    if (filters.is_active !== undefined) {
+      filteredRoutines = filteredRoutines.filter(r => r.is_active === filters.is_active)
+    }
+
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase()
+      filteredRoutines = filteredRoutines.filter(r =>
+        r.name.toLowerCase().includes(searchLower) ||
+        (r.description && r.description.toLowerCase().includes(searchLower))
+      )
+    }
+
+    return filteredRoutines
   }
 
   static async getUserRoutine(userId: string, routineId: string): Promise<UserRoutine | null> {
-    console.log('Get user routine stub called - returning null')
-    return null
+    console.log('🔥 [ENHANCED STUB] getUserRoutine called with:', { userId, routineId })
+
+    if (typeof window === 'undefined') {
+      return null
+    }
+
+    const routines = RoutineStorage.getUserRoutines(userId)
+    const routine = routines.find(r => r.id === routineId)
+
+    console.log(`Found routine:`, routine ? routine.name : 'not found')
+    return routine || null
   }
 
   static async createRoutineFromTemplate(userId: string, templateId: string, customizations: Partial<CreateUserRoutineInput> = {}): Promise<UserRoutine> {
@@ -100,17 +178,22 @@ export class RoutinesService {
   }
 
   static async createUserRoutine(userId: string, input: CreateUserRoutineInput): Promise<UserRoutine> {
-    console.log('🔧 [STUB] createUserRoutine called with:', { userId, input })
+    console.log('🔥 [ENHANCED STUB] createUserRoutine called with:', { userId, input })
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, cannot create routine')
+      throw new Error('Cannot create routine on server-side')
+    }
 
     // Validate input
     if (!input.steps || !Array.isArray(input.steps) || input.steps.length === 0) {
-      console.error('❌ [STUB] createUserRoutine: invalid steps')
+      console.error('❌ [ENHANCED STUB] createUserRoutine: invalid steps')
       throw new Error('Routine steps are required and must be a non-empty array')
     }
 
-    // Return a mock routine for now
-    const mockRoutine: UserRoutine = {
-      id: `routine-${Date.now()}`,
+    // Create routine and save to localStorage
+    const newRoutine: UserRoutine = {
+      id: `routine-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       user_id: userId,
       template_id: input.template_id,
       name: input.name,
@@ -139,8 +222,11 @@ export class RoutinesService {
       archived_at: undefined
     }
 
-    console.log('✅ [STUB] createUserRoutine returning mock routine:', mockRoutine)
-    return mockRoutine
+    // Save to localStorage
+    RoutineStorage.addUserRoutine(userId, newRoutine)
+
+    console.log('✅ [ENHANCED STUB] Created and saved routine:', newRoutine)
+    return newRoutine
   }
 
   static async updateUserRoutine(userId: string, routineId: string, updates: UpdateUserRoutineInput): Promise<UserRoutine> {
@@ -149,7 +235,15 @@ export class RoutinesService {
   }
 
   static async deleteUserRoutine(userId: string, routineId: string): Promise<void> {
-    console.log('Delete user routine stub called - not implemented yet')
+    console.log('🔥 [ENHANCED STUB] deleteUserRoutine called with:', { userId, routineId })
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, cannot delete routine')
+      return
+    }
+
+    RoutineStorage.removeUserRoutine(userId, routineId)
+    console.log('✅ [ENHANCED STUB] Deleted routine:', routineId)
   }
 
   // ============================================================================
@@ -199,7 +293,55 @@ export class RoutinesService {
   // ============================================================================
 
   static async getRoutineStats(userId: string): Promise<RoutineStats> {
-    console.log('Get routine stats stub called - returning empty stats')
+    console.log('🔥 [ENHANCED STUB] getRoutineStats called for userId:', userId)
+
+    if (typeof window === 'undefined') {
+      return this.getEmptyStats()
+    }
+
+    const routines = RoutineStorage.getUserRoutines(userId)
+    console.log(`Calculating stats for ${routines.length} routines`)
+
+    const activeRoutines = routines.filter(r => r.is_active && !r.archived_at)
+    const scheduledRoutines = routines.filter(r => r.is_scheduled)
+    const favoriteRoutines = routines.filter(r => r.is_favorite)
+
+    // Calculate category distribution
+    const categoryDistribution = routines.reduce((acc, routine) => {
+      acc[routine.category] = (acc[routine.category] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    const mostUsedCategory = Object.entries(categoryDistribution)
+      .sort(([,a], [,b]) => b - a)[0]?.[0] as RoutineCategory || 'General'
+
+    const stats: RoutineStats = {
+      total_routines: routines.length,
+      active_routines: activeRoutines.length,
+      scheduled_routines: scheduledRoutines.length,
+      favorite_routines: favoriteRoutines.length,
+      total_completions: routines.reduce((sum, r) => sum + r.total_completions, 0),
+      completions_this_week: 0, // Would need completion tracking
+      completions_this_month: 0, // Would need completion tracking
+      average_completion_rate: 0, // Would need completion tracking
+      current_streak: Math.max(...routines.map(r => r.current_streak), 0),
+      longest_streak: Math.max(...routines.map(r => r.best_streak), 0),
+      total_time_practiced: routines.reduce((sum, r) => sum + (r.estimated_duration * r.total_completions), 0),
+      average_session_duration: routines.length > 0 ?
+        Math.round(routines.reduce((sum, r) => sum + r.estimated_duration, 0) / routines.length) : 0,
+      most_practiced_time_of_day: 'anytime' as TimeOfDay,
+      most_used_category: mostUsedCategory,
+      category_distribution: categoryDistribution,
+      average_mood_improvement: 0,
+      average_energy_improvement: 0,
+      average_session_rating: 0
+    }
+
+    console.log('✅ [ENHANCED STUB] Calculated routine stats:', stats)
+    return stats
+  }
+
+  private static getEmptyStats(): RoutineStats {
     return {
       total_routines: 0,
       active_routines: 0,
