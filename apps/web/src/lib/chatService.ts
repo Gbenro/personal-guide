@@ -1,6 +1,17 @@
 // PostgreSQL Chat Service - replaces Supabase version
-import { db } from './simple-auth'
 import type { User } from './simple-auth'
+
+// Server-side only database connection
+let db: any = null
+if (typeof window === 'undefined') {
+  try {
+    // Dynamic import to avoid bundling server code on client
+    const auth = require('./simple-auth')
+    db = auth.db
+  } catch (error) {
+    console.warn('Database connection not available (client-side or missing):', error.message)
+  }
+}
 
 export interface ChatMessage {
   id: string
@@ -158,5 +169,19 @@ export async function getRecentChatSessions(userId: string, limit = 10): Promise
   } catch (error) {
     console.error('Error in getRecentChatSessions:', error)
     return []
+  }
+}
+
+// Convert database message to UI message format
+export function convertDbMessageToUI(dbMessage: ChatMessage) {
+  return {
+    id: dbMessage.id,
+    content: dbMessage.content,
+    role: dbMessage.role as 'user' | 'assistant',
+    timestamp: new Date(dbMessage.created_at),
+    mood: dbMessage.mood,
+    moodConfidence: dbMessage.mood_confidence,
+    emotionalKeywords: dbMessage.emotional_keywords,
+    personalityMode: dbMessage.personality_mode
   }
 }

@@ -1,7 +1,12 @@
 // Simple JWT Authentication for Railway
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
-import { Pool } from 'pg'
+
+// Server-side only imports
+let Pool: any = null
+if (typeof window === 'undefined') {
+  Pool = require('pg').Pool
+}
 
 console.log('🚀 Initializing database connection...')
 console.log('NODE_ENV:', process.env.NODE_ENV)
@@ -9,19 +14,21 @@ console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL)
 console.log('DATABASE_PUBLIC_URL exists:', !!process.env.DATABASE_PUBLIC_URL)
 console.log('Using:', process.env.DATABASE_PUBLIC_URL ? 'DATABASE_PUBLIC_URL' : 'DATABASE_URL')
 
-const db = new Pool({
+const db = Pool ? new Pool({
   connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-})
+}) : null
 
-// Test database connection
-db.on('connect', () => {
-  console.log('✅ Database connected successfully')
-})
+// Test database connection (server-side only)
+if (db) {
+  db.on('connect', () => {
+    console.log('✅ Database connected successfully')
+  })
 
-db.on('error', (err) => {
-  console.error('❌ Database connection error:', err)
-})
+  db.on('error', (err) => {
+    console.error('❌ Database connection error:', err)
+  })
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-fallback-secret-key'
 
@@ -56,6 +63,8 @@ export function verifyToken(token: string): User | null {
 
 // Create user
 export async function createUser(email: string, password: string, fullName?: string) {
+  if (!db) throw new Error('Database not available')
+
   console.log('🔐 Creating user:', { email, fullName, hasPassword: !!password })
   console.log('🗃️ Database URL available:', !!process.env.DATABASE_URL)
 
@@ -71,6 +80,8 @@ export async function createUser(email: string, password: string, fullName?: str
 
 // Login user
 export async function loginUser(email: string, password: string) {
+  if (!db) throw new Error('Database not available')
+
   const result = await db.query(
     'SELECT id, email, full_name, password_hash FROM users WHERE email = $1',
     [email]
@@ -100,3 +111,6 @@ export function getUserFromCookies(cookies: string): User | null {
     return null
   }
 }
+
+// Export db for other server-side modules
+export { db }
