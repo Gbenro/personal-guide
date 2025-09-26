@@ -12,7 +12,7 @@ import {
   type Reflection,
   type ReflectionStats,
   type ReflectionFilters
-} from '@/lib/reflectionService'
+} from '@/lib/reflectionService-stub'
 import {
   MagnifyingGlassIcon,
   FunnelIcon,

@@ -2,10 +2,10 @@
 // This is a basic verification test for the goal operations handler
 
 import { EntityOperationHandler } from '../entityOperationHandler'
-import { GoalsService } from '../goalsService'
+import { GoalsService } from '../goalsService-stub'
 
 // Mock the GoalsService
-jest.mock('../goalsService', () => ({
+jest.mock('../goalsService-stub', () => ({
   GoalsService: {
     createGoal: jest.fn(),
     getGoals: jest.fn(),
