@@ -244,29 +244,52 @@ export class RoutinesService {
    * Create custom user routine
    */
   static async createUserRoutine(userId: string, input: CreateUserRoutineInput): Promise<UserRoutine> {
+    console.log('🔧 [DEBUG] createUserRoutine called with:', { userId, input })
+
+    if (!input.steps) {
+      console.error('❌ [ERROR] createUserRoutine: input.steps is missing')
+      throw new Error('Routine steps are required')
+    }
+
     const steps = this.processStepsForDb(input.steps)
+    console.log('🔧 [DEBUG] processed steps:', steps)
+
+    const insertData = {
+      user_id: userId,
+      template_id: input.template_id,
+      name: input.name,
+      description: input.description,
+      category: input.category,
+      routine_type: input.routine_type,
+      steps,
+      estimated_duration: input.estimated_duration || this.calculateEstimatedDuration(steps),
+      preferred_time_of_day: input.preferred_time_of_day,
+      is_scheduled: input.is_scheduled || false,
+      scheduled_days: input.scheduled_days || [1, 2, 3, 4, 5, 6, 7],
+      scheduled_time: input.scheduled_time,
+      timezone: input.timezone
+    }
+
+    console.log('🔧 [DEBUG] inserting data:', insertData)
 
     const { data, error } = await supabase
       .from('user_routines')
-      .insert({
-        user_id: userId,
-        template_id: input.template_id,
-        name: input.name,
-        description: input.description,
-        category: input.category,
-        routine_type: input.routine_type,
-        steps,
-        estimated_duration: input.estimated_duration || this.calculateEstimatedDuration(steps),
-        preferred_time_of_day: input.preferred_time_of_day,
-        is_scheduled: input.is_scheduled || false,
-        scheduled_days: input.scheduled_days || [1, 2, 3, 4, 5, 6, 7],
-        scheduled_time: input.scheduled_time,
-        timezone: input.timezone
-      })
+      .insert(insertData)
       .select()
       .single()
 
-    if (error) throw error
+    console.log('🔧 [DEBUG] supabase response:', { data, error })
+
+    if (error) {
+      console.error('❌ [ERROR] createUserRoutine database error:', error)
+      throw error
+    }
+
+    if (!data) {
+      console.error('❌ [ERROR] createUserRoutine: no data returned from database')
+      throw new Error('No data returned from routine creation')
+    }
+
     return this.transformUserRoutineFromDb(data)
   }
 
@@ -715,14 +738,34 @@ export class RoutinesService {
   }
 
   private static transformUserRoutineFromDb(data: any): UserRoutine {
-    return {
-      ...data,
-      steps: data.steps || [],
-      scheduled_days: data.scheduled_days || [1, 2, 3, 4, 5, 6, 7],
-      last_completed_at: data.last_completed_at ? new Date(data.last_completed_at) : undefined,
-      created_at: new Date(data.created_at),
-      updated_at: new Date(data.updated_at),
-      archived_at: data.archived_at ? new Date(data.archived_at) : undefined
+    // DEBUG: Add diagnostic logging
+    console.log('🔍 [DEBUG] transformUserRoutineFromDb called with data:', JSON.stringify(data, null, 2))
+
+    if (!data) {
+      console.error('❌ [ERROR] transformUserRoutineFromDb: data is null or undefined')
+      throw new Error('Cannot transform null routine data')
+    }
+
+    if (!data.steps) {
+      console.warn('⚠️ [WARN] transformUserRoutineFromDb: data.steps is missing, using empty array')
+    }
+
+    try {
+      const result = {
+        ...data,
+        steps: data.steps || [],
+        scheduled_days: data.scheduled_days || [1, 2, 3, 4, 5, 6, 7],
+        last_completed_at: data.last_completed_at ? new Date(data.last_completed_at) : undefined,
+        created_at: new Date(data.created_at),
+        updated_at: new Date(data.updated_at),
+        archived_at: data.archived_at ? new Date(data.archived_at) : undefined
+      }
+
+      console.log('✅ [DEBUG] transformUserRoutineFromDb result:', JSON.stringify(result, null, 2))
+      return result
+    } catch (error) {
+      console.error('❌ [ERROR] transformUserRoutineFromDb failed:', error)
+      throw error
     }
   }
 
@@ -750,11 +793,34 @@ export class RoutinesService {
   }
 
   private static processStepsForDb(steps: any[]): any[] {
-    return steps.map((step, index) => ({
-      ...step,
-      id: step.id || crypto.randomUUID(),
-      order: step.order || index + 1
-    }))
+    console.log('🔧 [DEBUG] processStepsForDb input:', steps)
+
+    if (!steps || !Array.isArray(steps)) {
+      console.error('❌ [ERROR] processStepsForDb: steps is not an array:', steps)
+      throw new Error('Steps must be an array')
+    }
+
+    const processedSteps = steps.map((step, index) => {
+      if (!step) {
+        console.warn('⚠️ [WARN] processStepsForDb: empty step at index', index)
+        return {
+          id: crypto.randomUUID(),
+          order: index + 1,
+          title: `Step ${index + 1}`,
+          description: '',
+          duration: 60
+        }
+      }
+
+      return {
+        ...step,
+        id: step.id || crypto.randomUUID(),
+        order: step.order || index + 1
+      }
+    })
+
+    console.log('🔧 [DEBUG] processStepsForDb output:', processedSteps)
+    return processedSteps
   }
 
   private static calculateEstimatedDuration(steps: any[]): number {

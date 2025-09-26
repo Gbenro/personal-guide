@@ -1,5 +1,47 @@
-// Temporary stub for habit service to prevent Supabase errors
+// Enhanced stub for habit service with localStorage persistence
 // TODO: Replace with full PostgreSQL implementation
+
+// Simple in-memory storage with localStorage persistence
+class HabitStorage {
+  private static HABITS_KEY = 'pg_user_habits'
+  private static COMPLETIONS_KEY = 'pg_habit_completions'
+
+  static getHabits(userId: string): Habit[] {
+    try {
+      const habits = localStorage.getItem(`${this.HABITS_KEY}_${userId}`)
+      return habits ? JSON.parse(habits) : []
+    } catch (error) {
+      console.warn('Failed to load habits from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveHabits(userId: string, habits: Habit[]): void {
+    try {
+      localStorage.setItem(`${this.HABITS_KEY}_${userId}`, JSON.stringify(habits))
+    } catch (error) {
+      console.warn('Failed to save habits to localStorage:', error)
+    }
+  }
+
+  static getCompletions(userId: string): HabitCompletion[] {
+    try {
+      const completions = localStorage.getItem(`${this.COMPLETIONS_KEY}_${userId}`)
+      return completions ? JSON.parse(completions) : []
+    } catch (error) {
+      console.warn('Failed to load completions from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveCompletions(userId: string, completions: HabitCompletion[]): void {
+    try {
+      localStorage.setItem(`${this.COMPLETIONS_KEY}_${userId}`, JSON.stringify(completions))
+    } catch (error) {
+      console.warn('Failed to save completions to localStorage:', error)
+    }
+  }
+}
 
 export interface Habit {
   id: string
@@ -23,13 +65,34 @@ export interface HabitCompletion {
 
 // Stub functions that return empty results
 export async function getUserHabits(userId: string): Promise<Habit[]> {
-  console.log('Habit service stub called - returning empty habits')
-  return []
+  console.log('✅ [ENHANCED STUB] getUserHabits called for userId:', userId)
+
+  if (typeof window === 'undefined') {
+    console.log('Server-side, returning empty array')
+    return []
+  }
+
+  const habits = HabitStorage.getHabits(userId)
+  console.log(`Found ${habits.length} habits for user`)
+  return habits
 }
 
 export async function getTodayCompletions(userId: string): Promise<HabitCompletion[]> {
-  console.log('Habit completions stub called - returning empty completions')
-  return []
+  console.log('✅ [ENHANCED STUB] getTodayCompletions called for userId:', userId)
+
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  const allCompletions = HabitStorage.getCompletions(userId)
+  const today = new Date().toISOString().split('T')[0]
+
+  const todayCompletions = allCompletions.filter(completion =>
+    completion.completed_at.startsWith(today)
+  )
+
+  console.log(`Found ${todayCompletions.length} completions for today`)
+  return todayCompletions
 }
 
 // Single habit creation
@@ -41,8 +104,31 @@ export async function createHabit(
   targetFrequency?: number,
   frequencyPeriod?: 'daily' | 'weekly' | 'monthly'
 ): Promise<Habit | null> {
-  console.log('Create habit stub called - not implemented yet')
-  return null
+  console.log('✅ [ENHANCED STUB] createHabit called with:', { userId, name, description, color })
+
+  if (typeof window === 'undefined') {
+    console.log('Server-side, cannot create habit')
+    return null
+  }
+
+  const newHabit: Habit = {
+    id: `habit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    user_id: userId,
+    name,
+    description: description || '',
+    color: color || '#3B82F6',
+    target_frequency: targetFrequency || 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    archived_at: undefined
+  }
+
+  const existingHabits = HabitStorage.getHabits(userId)
+  const updatedHabits = [...existingHabits, newHabit]
+  HabitStorage.saveHabits(userId, updatedHabits)
+
+  console.log('✅ Created new habit:', newHabit)
+  return newHabit
 }
 
 // Batch habit creation
@@ -55,8 +141,26 @@ export async function createHabits(
 }
 
 export async function completeHabit(habitId: string, userId: string, notes?: string): Promise<HabitCompletion | null> {
-  console.log('Complete habit stub called - not implemented yet')
-  return null
+  console.log('✅ [ENHANCED STUB] completeHabit called with:', { habitId, userId, notes })
+
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const completion: HabitCompletion = {
+    id: `completion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    habit_id: habitId,
+    user_id: userId,
+    completed_at: new Date().toISOString(),
+    notes: notes || undefined
+  }
+
+  const existingCompletions = HabitStorage.getCompletions(userId)
+  const updatedCompletions = [...existingCompletions, completion]
+  HabitStorage.saveCompletions(userId, updatedCompletions)
+
+  console.log('✅ Created habit completion:', completion)
+  return completion
 }
 
 // Singular version for single habit updates
@@ -108,8 +212,59 @@ export async function archiveHabits(habitIds: string[]): Promise<boolean> {
 }
 
 export async function getHabitStats(userId: string): Promise<HabitStats | null> {
-  console.log('Get habit stats stub called - not implemented yet')
-  return null
+  console.log('✅ [ENHANCED STUB] getHabitStats called for userId:', userId)
+
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const habits = HabitStorage.getHabits(userId)
+  const completions = HabitStorage.getCompletions(userId)
+
+  // Calculate today's completions
+  const today = new Date().toISOString().split('T')[0]
+  const todayCompletions = completions.filter(c => c.completed_at.startsWith(today))
+
+  // Calculate basic stats
+  const stats: HabitStats = {
+    totalHabits: habits.length,
+    activeHabits: habits.filter(h => !h.archived_at).length,
+    archivedHabits: habits.filter(h => h.archived_at).length,
+    totalCompletions: completions.length,
+    todayCompletions: todayCompletions.length,
+    streakCount: calculateCurrentStreak(completions)
+  }
+
+  console.log('✅ Calculated habit stats:', stats)
+  return stats
+}
+
+// Helper function to calculate current streak
+function calculateCurrentStreak(completions: HabitCompletion[]): number {
+  if (completions.length === 0) return 0
+
+  const sortedCompletions = completions
+    .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+
+  let streak = 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  for (let i = 0; i < sortedCompletions.length; i++) {
+    const completionDate = new Date(sortedCompletions[i].completed_at)
+    completionDate.setHours(0, 0, 0, 0)
+
+    const expectedDate = new Date(today)
+    expectedDate.setDate(expectedDate.getDate() - streak)
+
+    if (completionDate.getTime() === expectedDate.getTime()) {
+      streak++
+    } else {
+      break
+    }
+  }
+
+  return streak
 }
 
 export async function undoHabitCompletion(habitId: string, userId: string): Promise<boolean> {
