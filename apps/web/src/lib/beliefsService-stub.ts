@@ -1,5 +1,70 @@
-// Temporary stub for beliefs service to prevent Supabase errors
+// Enhanced stub for beliefs service with localStorage persistence and 21-day cycle tracking
 // TODO: Replace with full PostgreSQL implementation
+
+// localStorage-based storage for beliefs and cycles
+class BeliefStorage {
+  private static BELIEF_SYSTEMS_KEY = 'pg_belief_systems'
+  private static USER_CYCLES_KEY = 'pg_user_belief_cycles'
+  private static DAILY_ACTIVITIES_KEY = 'pg_daily_belief_activities'
+
+  static getBeliefSystems(userId: string): BeliefSystem[] {
+    try {
+      const systems = localStorage.getItem(`${this.BELIEF_SYSTEMS_KEY}_${userId}`)
+      return systems ? JSON.parse(systems) : []
+    } catch (error) {
+      console.warn('Failed to load belief systems from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveBeliefSystems(userId: string, systems: BeliefSystem[]): void {
+    try {
+      localStorage.setItem(`${this.BELIEF_SYSTEMS_KEY}_${userId}`, JSON.stringify(systems))
+    } catch (error) {
+      console.warn('Failed to save belief systems to localStorage:', error)
+    }
+  }
+
+  static addBeliefSystem(userId: string, system: BeliefSystem): void {
+    const existing = this.getBeliefSystems(userId)
+    const updated = [...existing, system]
+    this.saveBeliefSystems(userId, updated)
+  }
+
+  static getUserCycles(userId: string): UserBeliefCycle[] {
+    try {
+      const cycles = localStorage.getItem(`${this.USER_CYCLES_KEY}_${userId}`)
+      return cycles ? JSON.parse(cycles) : []
+    } catch (error) {
+      console.warn('Failed to load belief cycles from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveUserCycles(userId: string, cycles: UserBeliefCycle[]): void {
+    try {
+      localStorage.setItem(`${this.USER_CYCLES_KEY}_${userId}`, JSON.stringify(cycles))
+    } catch (error) {
+      console.warn('Failed to save belief cycles to localStorage:', error)
+    }
+  }
+
+  static addUserCycle(userId: string, cycle: UserBeliefCycle): void {
+    const existing = this.getUserCycles(userId)
+    const updated = [...existing, cycle]
+    this.saveUserCycles(userId, updated)
+  }
+
+  static updateUserCycle(userId: string, cycleId: string, updates: Partial<UserBeliefCycle>): UserBeliefCycle | null {
+    const cycles = this.getUserCycles(userId)
+    const index = cycles.findIndex(c => c.id === cycleId)
+    if (index === -1) return null
+
+    cycles[index] = { ...cycles[index], ...updates, updated_at: new Date() }
+    this.saveUserCycles(userId, cycles)
+    return cycles[index]
+  }
+}
 
 import type {
   BeliefSystem,
@@ -28,8 +93,43 @@ export class BeliefsService {
   // ============================================================================
 
   static async getBeliefSystems(userId: string, filters: BeliefSystemFilters = {}): Promise<BeliefSystem[]> {
-    console.log('🔧 [STUB] getBeliefSystems called - returning sample systems')
+    console.log('🔥 [ENHANCED STUB] getBeliefSystems called for userId:', userId)
 
+    if (typeof window === 'undefined') {
+      return this.getSampleSystems()
+    }
+
+    // Get user's custom belief systems
+    const userSystems = BeliefStorage.getBeliefSystems(userId)
+
+    // Combine with sample public systems
+    const allSystems = [...this.getSampleSystems(), ...userSystems]
+
+    // Apply filters
+    let filteredSystems = allSystems
+
+    if (filters.category?.length) {
+      filteredSystems = filteredSystems.filter(s => filters.category!.includes(s.category))
+    }
+
+    if (filters.is_public !== undefined) {
+      filteredSystems = filteredSystems.filter(s => s.is_public === filters.is_public)
+    }
+
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase()
+      filteredSystems = filteredSystems.filter(s =>
+        s.title.toLowerCase().includes(searchLower) ||
+        s.description.toLowerCase().includes(searchLower) ||
+        s.belief_statement.toLowerCase().includes(searchLower)
+      )
+    }
+
+    console.log(`Returning ${filteredSystems.length} belief systems (${userSystems.length} user, ${this.getSampleSystems().length} public)`)
+    return filteredSystems
+  }
+
+  private static getSampleSystems(): BeliefSystem[] {
     return [
       {
         id: 'sample-1',
@@ -120,11 +220,15 @@ export class BeliefsService {
   }
 
   static async createBeliefSystem(userId: string, input: CreateBeliefSystemInput): Promise<BeliefSystem> {
-    console.log('🔧 [STUB] createBeliefSystem called with:', { userId, input })
+    console.log('🔥 [ENHANCED STUB] createBeliefSystem called with:', { userId, input })
 
-    // Return mock created system
-    const mockSystem: BeliefSystem = {
-      id: `belief-system-${Date.now()}`,
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot create belief system on server-side')
+    }
+
+    // Create and save belief system
+    const newSystem: BeliefSystem = {
+      id: `belief-system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       user_id: userId,
       created_by: userId,
       title: input.title,
@@ -134,7 +238,12 @@ export class BeliefsService {
       affirmations: input.affirmations,
       visualization_script: input.visualization_script,
       journaling_prompts: input.journaling_prompts || [],
-      daily_activities: input.daily_activities || [],
+      daily_activities: input.daily_activities || [
+        'Read affirmations with conviction',
+        'Practice visualization exercise',
+        'Journal about belief progress',
+        'Speak affirmation aloud 3 times'
+      ],
       cycle_length: input.cycle_length || 21,
       difficulty_level: 3,
       times_started: 0,
@@ -146,8 +255,11 @@ export class BeliefsService {
       updated_at: new Date()
     }
 
-    console.log('✅ [STUB] createBeliefSystem returning mock system:', mockSystem)
-    return mockSystem
+    // Save to localStorage
+    BeliefStorage.addBeliefSystem(userId, newSystem)
+
+    console.log('✅ [ENHANCED STUB] Created and saved belief system:', newSystem)
+    return newSystem
   }
 
   // ============================================================================
@@ -155,30 +267,71 @@ export class BeliefsService {
   // ============================================================================
 
   static async getUserBeliefCycles(userId: string, filters: BeliefCycleFilters = {}): Promise<UserBeliefCycle[]> {
-    console.log('🔧 [STUB] getUserBeliefCycles called - returning empty cycles')
-    return []
+    console.log('🔥 [ENHANCED STUB] getUserBeliefCycles called for userId:', userId)
+
+    if (typeof window === 'undefined') {
+      return []
+    }
+
+    const cycles = BeliefStorage.getUserCycles(userId)
+    console.log(`Found ${cycles.length} belief cycles for user`)
+
+    // Apply filters
+    let filteredCycles = cycles.filter(c => !c.archived_at)
+
+    if (filters.status?.length) {
+      filteredCycles = filteredCycles.filter(c => filters.status!.includes(c.status))
+    }
+
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase()
+      filteredCycles = filteredCycles.filter(c =>
+        c.title.toLowerCase().includes(searchLower) ||
+        (c.personal_belief_statement && c.personal_belief_statement.toLowerCase().includes(searchLower))
+      )
+    }
+
+    return filteredCycles
   }
 
   static async getUserBeliefCycle(userId: string, cycleId: string): Promise<UserBeliefCycle | null> {
-    console.log('🔧 [STUB] getUserBeliefCycle called - returning null')
-    return null
+    console.log('🔥 [ENHANCED STUB] getUserBeliefCycle called with:', { userId, cycleId })
+
+    if (typeof window === 'undefined') {
+      return null
+    }
+
+    const cycles = BeliefStorage.getUserCycles(userId)
+    const cycle = cycles.find(c => c.id === cycleId)
+
+    console.log(`Found cycle:`, cycle ? cycle.title : 'not found')
+    return cycle || null
   }
 
   static async createBeliefCycle(userId: string, input: CreateBeliefCycleInput): Promise<UserBeliefCycle> {
-    console.log('🔧 [STUB] createBeliefCycle called with:', { userId, input })
+    console.log('🔥 [ENHANCED STUB] createBeliefCycle called with:', { userId, input })
 
-    // Return mock cycle
-    const mockCycle: UserBeliefCycle = {
-      id: `belief-cycle-${Date.now()}`,
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot create belief cycle on server-side')
+    }
+
+    // Get belief system to calculate cycle length
+    const allSystems = await this.getBeliefSystems(userId)
+    const beliefSystem = allSystems.find(s => s.id === input.belief_system_id)
+    const cycleLength = beliefSystem?.cycle_length || 21
+
+    // Create new belief cycle
+    const newCycle: UserBeliefCycle = {
+      id: `belief-cycle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       user_id: userId,
       belief_system_id: input.belief_system_id,
-      title: input.title || 'New Belief Cycle',
-      personal_belief_statement: input.personal_belief_statement || 'I am creating positive change',
+      title: input.title || beliefSystem?.title || 'New Belief Cycle',
+      personal_belief_statement: input.personal_belief_statement || beliefSystem?.belief_statement || 'I am creating positive change',
       personal_reason: input.personal_reason,
       status: 'active',
       current_day: 1,
       start_date: new Date(),
-      target_completion_date: this.calculateTargetDate(21),
+      target_completion_date: this.calculateTargetDate(cycleLength),
       actual_completion_date: undefined,
       days_completed: 0,
       consecutive_days: 0,
@@ -189,19 +342,44 @@ export class BeliefsService {
       preferred_reminder_time: input.preferred_reminder_time,
       custom_affirmations: input.custom_affirmations || [],
       custom_activities: input.custom_activities || [],
-      belief_systems: undefined, // Would be populated in real implementation
+      belief_systems: beliefSystem, // Include the belief system data
       created_at: new Date(),
       updated_at: new Date(),
       archived_at: undefined
     }
 
-    console.log('✅ [STUB] createBeliefCycle returning mock cycle:', mockCycle)
-    return mockCycle
+    // Save to localStorage
+    BeliefStorage.addUserCycle(userId, newCycle)
+
+    // Update belief system usage count
+    if (beliefSystem && beliefSystem.user_id === userId) {
+      const systems = BeliefStorage.getBeliefSystems(userId)
+      const systemIndex = systems.findIndex(s => s.id === input.belief_system_id)
+      if (systemIndex !== -1) {
+        systems[systemIndex].times_started += 1
+        BeliefStorage.saveBeliefSystems(userId, systems)
+      }
+    }
+
+    console.log('✅ [ENHANCED STUB] Created and saved belief cycle:', newCycle)
+    return newCycle
   }
 
   static async updateBeliefCycle(userId: string, cycleId: string, updates: UpdateBeliefCycleInput): Promise<UserBeliefCycle> {
-    console.log('🔧 [STUB] updateBeliefCycle called - not implemented')
-    throw new Error('Update belief cycle not yet implemented')
+    console.log('🔥 [ENHANCED STUB] updateBeliefCycle called with:', { userId, cycleId, updates })
+
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot update belief cycle on server-side')
+    }
+
+    const updatedCycle = BeliefStorage.updateUserCycle(userId, cycleId, updates)
+
+    if (!updatedCycle) {
+      throw new Error('Belief cycle not found')
+    }
+
+    console.log('✅ [ENHANCED STUB] Updated belief cycle:', updatedCycle)
+    return updatedCycle
   }
 
   // ============================================================================
@@ -228,8 +406,62 @@ export class BeliefsService {
   // ============================================================================
 
   static async getBeliefStats(userId: string): Promise<BeliefStats> {
-    console.log('🔧 [STUB] getBeliefStats called - returning empty stats')
+    console.log('🔥 [ENHANCED STUB] getBeliefStats called for userId:', userId)
 
+    if (typeof window === 'undefined') {
+      return this.getEmptyStats()
+    }
+
+    const cycles = BeliefStorage.getUserCycles(userId)
+    const systems = BeliefStorage.getBeliefSystems(userId)
+    console.log(`Calculating stats for ${cycles.length} cycles and ${systems.length} systems`)
+
+    const activeCycles = cycles.filter(c => c.status === 'active')
+    const completedCycles = cycles.filter(c => c.status === 'completed')
+    const pausedCycles = cycles.filter(c => c.status === 'paused')
+
+    // Calculate category distribution from cycles
+    const categoryDistribution = cycles.reduce((acc, cycle) => {
+      const system = systems.find(s => s.id === cycle.belief_system_id)
+      const category = system?.category || 'Personal Growth'
+      acc[category] = (acc[category] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    const mostPracticedCategory = Object.entries(categoryDistribution)
+      .sort(([,a], [,b]) => b - a)[0]?.[0] as BeliefCategory || 'Personal Growth'
+
+    const stats: BeliefStats = {
+      total_cycles: cycles.length,
+      active_cycles: activeCycles.length,
+      completed_cycles: completedCycles.length,
+      paused_cycles: pausedCycles.length,
+      total_days_practiced: cycles.reduce((sum, c) => sum + c.days_completed, 0),
+      current_streak: Math.max(...cycles.map(c => c.consecutive_days), 0),
+      longest_streak: Math.max(...cycles.map(c => c.consecutive_days), 0), // Simplified
+      average_cycle_completion_rate: cycles.length > 0 ?
+        Math.round(cycles.reduce((sum, c) => {
+          const cycleLength = 21 // Default cycle length
+          return sum + (c.days_completed / cycleLength) * 100
+        }, 0) / cycles.length) : 0,
+      average_belief_strength_improvement: cycles.length > 0 ?
+        cycles.reduce((sum, c) => sum + ((c.current_belief_strength || 3) - (c.initial_belief_strength || 3)), 0) / cycles.length : 0,
+      average_mood_improvement: 0, // Would need daily activity tracking
+      average_confidence_improvement: 0, // Would need daily activity tracking
+      most_practiced_category: mostPracticedCategory,
+      category_distribution: categoryDistribution as Record<BeliefCategory, number>,
+      total_affirmations_spoken: cycles.reduce((sum, c) => sum + (c.total_activities_completed || 0), 0),
+      total_visualization_minutes: cycles.reduce((sum, c) => sum + (c.days_completed * 5), 0), // Estimate 5 min per day
+      total_journal_entries: cycles.reduce((sum, c) => sum + c.days_completed, 0), // Assume 1 entry per completed day
+      average_daily_completion_rate: cycles.length > 0 ?
+        Math.round(cycles.reduce((sum, c) => sum + (c.days_completed > 0 ? 100 : 0), 0) / cycles.length) : 0
+    }
+
+    console.log('✅ [ENHANCED STUB] Calculated belief stats:', stats)
+    return stats
+  }
+
+  private static getEmptyStats(): BeliefStats {
     return {
       total_cycles: 0,
       active_cycles: 0,
