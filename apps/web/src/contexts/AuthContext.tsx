@@ -29,9 +29,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { user } = await response.json()
         setUser(user)
       } else {
+        // 401 is expected for non-authenticated users
         setUser(null)
       }
     } catch (error) {
+      console.log('Auth check failed (expected for first visit):', error)
       setUser(null)
     } finally {
       setLoading(false)
