@@ -1,10 +1,10 @@
 import { ParsedEntityOperation, EntityType, OperationType, validateEntityParameters } from './chatEntityParser'
 import { createHabit, updateHabit, deleteHabit, getUserHabits, toggleHabitCompletion, getTodayCompletions, calculateStreak } from './habitService'
-import { GoalsService } from './goalsService'
+import { GoalsService } from './goalsService-stub'
 import { createJournalEntry, updateJournalEntry, deleteJournalEntry, getUserJournalEntries } from './journalService'
 import { createMoodEnergyEntry, getMoodEnergyEntries, updateMoodEnergyEntry, deleteMoodEnergyEntry, getMoodEnergyStats, getTodaysMoodEnergy, getMoodPatterns } from './moodEnergyService'
-import { RoutinesService } from './routinesService'
-import { BeliefsService } from './beliefsService'
+import { RoutinesService } from './routinesService-stub'
+import { BeliefsService } from './beliefsService-stub'
 import { SynchronicityService } from './synchronicityService'
 
 // =============================================================================

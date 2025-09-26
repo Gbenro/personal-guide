@@ -2,7 +2,7 @@
 // Provides React Query integration for hierarchical SMART goals
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { GoalsService } from '@/lib/goalsService'
+import { GoalsService } from '@/lib/goalsService-stub'
 import type {
   Goal,
   GoalProgressLog,
