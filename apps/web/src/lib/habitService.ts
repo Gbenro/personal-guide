@@ -65,7 +65,7 @@ export interface HabitCompletion {
 
 // Stub functions that return empty results
 export async function getUserHabits(userId: string): Promise<Habit[]> {
-  console.log('✅ [ENHANCED STUB] getUserHabits called for userId:', userId)
+  console.log('🔥 [ENHANCED STUB - FORCE UPDATE] getUserHabits called for userId:', userId)
 
   if (typeof window === 'undefined') {
     console.log('Server-side, returning empty array')
@@ -104,7 +104,7 @@ export async function createHabit(
   targetFrequency?: number,
   frequencyPeriod?: 'daily' | 'weekly' | 'monthly'
 ): Promise<Habit | null> {
-  console.log('✅ [ENHANCED STUB] createHabit called with:', { userId, name, description, color })
+  console.log('🔥 [ENHANCED STUB - FORCE UPDATE] createHabit called with:', { userId, name, description, color })
 
   if (typeof window === 'undefined') {
     console.log('Server-side, cannot create habit')
@@ -212,7 +212,7 @@ export async function archiveHabits(habitIds: string[]): Promise<boolean> {
 }
 
 export async function getHabitStats(userId: string): Promise<HabitStats | null> {
-  console.log('✅ [ENHANCED STUB] getHabitStats called for userId:', userId)
+  console.log('🔥 [ENHANCED STUB - FORCE UPDATE] getHabitStats called for userId:', userId)
 
   if (typeof window === 'undefined') {
     return null
