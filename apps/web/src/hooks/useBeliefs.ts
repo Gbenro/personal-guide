@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import { BeliefsService } from '../lib/beliefsService-stub'
+import { BeliefsService } from '../lib/beliefsService'
 import type {
   BeliefSystem,
   UserBeliefCycle,

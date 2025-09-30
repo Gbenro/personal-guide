@@ -3,8 +3,8 @@ import { chatEntityParser } from '../chatEntityParser'
 import { EntityOperationHandler } from '../entityOperationHandler'
 
 // Mock the services
-jest.mock('../routinesService-stub')
-jest.mock('../beliefsService-stub')
+jest.mock('../routinesService')
+jest.mock('../beliefsService')
 jest.mock('../synchronicityService')
 
 describe('Entity Operations Chat Integration', () => {

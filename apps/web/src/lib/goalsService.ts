@@ -1,7 +1,79 @@
-// Goals Service - Hierarchical SMART Goals System
-// Handles CRUD operations, hierarchy management, and SMART goals framework
+// Enhanced stub for goals service with localStorage persistence
+// TODO: Replace with full PostgreSQL implementation
 
-import { supabase } from './supabase'
+// Simple localStorage-based storage for goals
+class GoalStorage {
+  private static GOALS_KEY = 'pg_user_goals'
+  private static PROGRESS_KEY = 'pg_goal_progress'
+  private static ALIGNMENTS_KEY = 'pg_goal_alignments'
+
+  static getUserGoals(userId: string): Goal[] {
+    try {
+      const goals = localStorage.getItem(`${this.GOALS_KEY}_${userId}`)
+      return goals ? JSON.parse(goals) : []
+    } catch (error) {
+      console.warn('Failed to load goals from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveUserGoals(userId: string, goals: Goal[]): void {
+    try {
+      localStorage.setItem(`${this.GOALS_KEY}_${userId}`, JSON.stringify(goals))
+    } catch (error) {
+      console.warn('Failed to save goals to localStorage:', error)
+    }
+  }
+
+  static addUserGoal(userId: string, goal: Goal): void {
+    const existingGoals = this.getUserGoals(userId)
+    const updatedGoals = [...existingGoals, goal]
+    this.saveUserGoals(userId, updatedGoals)
+  }
+
+  static updateUserGoal(userId: string, goalId: string, updates: Partial<Goal>): Goal | null {
+    const existingGoals = this.getUserGoals(userId)
+    const goalIndex = existingGoals.findIndex(g => g.id === goalId)
+
+    if (goalIndex === -1) return null
+
+    const updatedGoal = { ...existingGoals[goalIndex], ...updates, updated_at: new Date() }
+    existingGoals[goalIndex] = updatedGoal
+    this.saveUserGoals(userId, existingGoals)
+    return updatedGoal
+  }
+
+  static removeUserGoal(userId: string, goalId: string): void {
+    const existingGoals = this.getUserGoals(userId)
+    const updatedGoals = existingGoals.filter(g => g.id !== goalId)
+    this.saveUserGoals(userId, updatedGoals)
+  }
+
+  static getProgressLogs(userId: string): GoalProgressLog[] {
+    try {
+      const logs = localStorage.getItem(`${this.PROGRESS_KEY}_${userId}`)
+      return logs ? JSON.parse(logs) : []
+    } catch (error) {
+      console.warn('Failed to load progress logs from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveProgressLogs(userId: string, logs: GoalProgressLog[]): void {
+    try {
+      localStorage.setItem(`${this.PROGRESS_KEY}_${userId}`, JSON.stringify(logs))
+    } catch (error) {
+      console.warn('Failed to save progress logs to localStorage:', error)
+    }
+  }
+
+  static addProgressLog(userId: string, log: GoalProgressLog): void {
+    const existingLogs = this.getProgressLogs(userId)
+    const updatedLogs = [...existingLogs, log]
+    this.saveProgressLogs(userId, updatedLogs)
+  }
+}
+
 import type {
   Goal,
   GoalProgressLog,
@@ -28,28 +100,27 @@ export class GoalsService {
   // CORE CRUD OPERATIONS
   // ============================================================================
 
-  /**
-   * Create a new goal with SMART criteria
-   */
   static async createGoal(userId: string, input: CreateGoalInput): Promise<Goal> {
+    console.log('🔥 [ENHANCED STUB] createGoal called with:', { userId, input })
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, cannot create goal')
+      throw new Error('Cannot create goal on server-side')
+    }
+
     // Calculate hierarchy level based on parent
     let hierarchy_level = 0
     if (input.parent_goal_id) {
-      const { data: parent } = await supabase
-        .from('goals')
-        .select('hierarchy_level')
-        .eq('id', input.parent_goal_id)
-        .single()
-
+      const existingGoals = GoalStorage.getUserGoals(userId)
+      const parent = existingGoals.find(g => g.id === input.parent_goal_id)
       if (parent) {
         hierarchy_level = parent.hierarchy_level + 1
       }
     }
 
-    // Validate goal type vs hierarchy level
-    this.validateGoalTypeHierarchy(input.goal_type, hierarchy_level)
-
-    const goalData = {
+    // Create goal
+    const newGoal: Goal = {
+      id: `goal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       user_id: userId,
       title: input.title,
       description: input.description,
@@ -63,16 +134,18 @@ export class GoalsService {
       measurable: input.measurable,
       achievable: input.achievable,
       relevant: input.relevant,
-      time_bound: input.time_bound.toISOString(),
+      time_bound: input.time_bound,
 
       // Progress
       target_value: input.target_value,
+      current_value: 0,
       unit: input.unit,
       progress_percentage: 0,
+      status: 'active',
 
       // Scheduling
-      start_date: (input.start_date || new Date()).toISOString().split('T')[0],
-      target_date: input.target_date.toISOString().split('T')[0],
+      start_date: input.start_date || new Date(),
+      target_date: input.target_date,
 
       // Metadata
       priority: input.priority || 3,
@@ -80,227 +153,212 @@ export class GoalsService {
       energy_required: input.energy_required || 3,
       notes: input.notes,
       tags: input.tags || [],
-      milestones: this.processMilestones(input.milestones || [])
+      milestones: input.milestones?.map((m, i) => ({
+        ...m,
+        id: `milestone-${Date.now()}-${i}`,
+        completed: false
+      })) || [],
+
+      created_at: new Date(),
+      updated_at: new Date(),
+      completion_date: undefined,
+      archived_at: undefined
     }
 
-    const { data, error } = await supabase
-      .from('goals')
-      .insert(goalData)
-      .select()
-      .single()
+    // Save to localStorage
+    GoalStorage.addUserGoal(userId, newGoal)
 
-    if (error) throw error
-
-    // Create alignment if this has a parent
-    if (input.parent_goal_id) {
-      await this.createGoalAlignment(userId, input.parent_goal_id, data.id)
-    }
-
-    return this.transformGoalFromDb(data)
+    console.log('✅ [ENHANCED STUB] Created and saved goal:', newGoal)
+    return newGoal
   }
 
-  /**
-   * Get goal by ID with optional child goals
-   */
   static async getGoal(userId: string, goalId: string, includeChildren = false): Promise<Goal | null> {
-    const { data, error } = await supabase
-      .from('goals')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', goalId)
-      .single()
+    console.log('🔥 [ENHANCED STUB] getGoal called with:', { userId, goalId, includeChildren })
 
-    if (error || !data) return null
-
-    let goal = this.transformGoalFromDb(data)
-
-    if (includeChildren) {
-      goal.child_goals = await this.getChildGoals(userId, goalId)
+    if (typeof window === 'undefined') {
+      return null
     }
 
+    const goals = GoalStorage.getUserGoals(userId)
+    const goal = goals.find(g => g.id === goalId)
+
+    if (!goal) {
+      console.log('Goal not found')
+      return null
+    }
+
+    if (includeChildren) {
+      const childGoals = goals.filter(g => g.parent_goal_id === goalId)
+      goal.child_goals = childGoals
+    }
+
+    console.log(`Found goal: ${goal.title}`)
     return goal
   }
 
-  /**
-   * Get all goals for user with filters
-   */
   static async getGoals(userId: string, filters: GoalFilters = {}): Promise<Goal[]> {
-    let query = supabase
-      .from('goals')
-      .select('*')
-      .eq('user_id', userId)
-      .is('archived_at', null)
+    console.log('🔥 [ENHANCED STUB] getGoals called for userId:', userId)
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, returning empty array')
+      return []
+    }
+
+    let goals = GoalStorage.getUserGoals(userId).filter(g => !g.archived_at)
+    console.log(`Found ${goals.length} goals for user`)
 
     // Apply filters
     if (filters.status?.length) {
-      query = query.in('status', filters.status)
+      goals = goals.filter(g => filters.status!.includes(g.status))
     }
 
     if (filters.goal_type?.length) {
-      query = query.in('goal_type', filters.goal_type)
+      goals = goals.filter(g => filters.goal_type!.includes(g.goal_type))
     }
 
     if (filters.category?.length) {
-      query = query.in('category', filters.category)
+      goals = goals.filter(g => filters.category!.includes(g.category))
     }
 
     if (filters.priority?.length) {
-      query = query.in('priority', filters.priority)
+      goals = goals.filter(g => filters.priority!.includes(g.priority))
     }
 
     if (filters.parent_goal_id) {
-      query = query.eq('parent_goal_id', filters.parent_goal_id)
+      goals = goals.filter(g => g.parent_goal_id === filters.parent_goal_id)
     }
 
     if (filters.due_soon) {
       const sevenDaysFromNow = new Date()
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
-      query = query.lte('target_date', sevenDaysFromNow.toISOString().split('T')[0])
+      goals = goals.filter(g => new Date(g.target_date) <= sevenDaysFromNow)
     }
 
     if (filters.overdue) {
-      const today = new Date().toISOString().split('T')[0]
-      query = query.lt('target_date', today).eq('status', 'active')
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      goals = goals.filter(g => new Date(g.target_date) < today && g.status === 'active')
     }
 
     if (filters.search) {
-      query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`)
+      const searchLower = filters.search.toLowerCase()
+      goals = goals.filter(g =>
+        g.title.toLowerCase().includes(searchLower) ||
+        (g.description && g.description.toLowerCase().includes(searchLower)) ||
+        (g.notes && g.notes.toLowerCase().includes(searchLower))
+      )
     }
 
     if (filters.tags?.length) {
-      query = query.overlaps('tags', filters.tags)
+      goals = goals.filter(g =>
+        filters.tags!.some(tag => g.tags.includes(tag))
+      )
     }
 
-    // Order by hierarchy level, then priority, then target date
-    query = query.order('hierarchy_level').order('priority').order('target_date')
+    // Sort by hierarchy level, then priority, then target date
+    goals.sort((a, b) => {
+      if (a.hierarchy_level !== b.hierarchy_level) {
+        return a.hierarchy_level - b.hierarchy_level
+      }
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority
+      }
+      return new Date(a.target_date).getTime() - new Date(b.target_date).getTime()
+    })
 
-    const { data, error } = await query
-
-    if (error) throw error
-    return (data || []).map(this.transformGoalFromDb)
+    return goals
   }
 
-  /**
-   * Update goal
-   */
   static async updateGoal(userId: string, goalId: string, updates: UpdateGoalInput): Promise<Goal> {
-    const updateData: any = { ...updates }
+    console.log('🔥 [ENHANCED STUB] updateGoal called with:', { userId, goalId, updates })
 
-    // Handle date formatting
-    if (updates.time_bound) {
-      updateData.time_bound = updates.time_bound.toISOString()
-    }
-    if (updates.start_date) {
-      updateData.start_date = updates.start_date.toISOString().split('T')[0]
-    }
-    if (updates.target_date) {
-      updateData.target_date = updates.target_date.toISOString().split('T')[0]
-    }
-    if (updates.completion_date) {
-      updateData.completion_date = updates.completion_date.toISOString().split('T')[0]
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot update goal on server-side')
     }
 
     // Auto-complete if progress reaches 100%
     if (updates.progress_percentage === 100 && !updates.status) {
-      updateData.status = 'completed'
-      updateData.completion_date = new Date().toISOString().split('T')[0]
+      updates.status = 'completed'
+      updates.completion_date = new Date()
     }
 
-    const { data, error } = await supabase
-      .from('goals')
-      .update(updateData)
-      .eq('user_id', userId)
-      .eq('id', goalId)
-      .select()
-      .single()
-
-    if (error) throw error
+    const updatedGoal = GoalStorage.updateUserGoal(userId, goalId, updates)
+    if (!updatedGoal) {
+      throw new Error('Goal not found')
+    }
 
     // Update parent goal progress if this goal has a parent
-    const goal = this.transformGoalFromDb(data)
-    if (goal.parent_goal_id) {
-      await this.updateParentGoalProgress(userId, goal.parent_goal_id)
+    if (updatedGoal.parent_goal_id) {
+      await this.updateParentGoalProgress(userId, updatedGoal.parent_goal_id)
     }
 
-    return goal
+    console.log('✅ [ENHANCED STUB] Updated goal:', updatedGoal)
+    return updatedGoal
   }
 
-  /**
-   * Delete goal (with cascade to children)
-   */
   static async deleteGoal(userId: string, goalId: string): Promise<void> {
+    console.log('🔥 [ENHANCED STUB] deleteGoal called with:', { userId, goalId })
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, cannot delete goal')
+      return
+    }
+
     // First delete all child goals
-    const children = await this.getChildGoals(userId, goalId)
-    for (const child of children) {
+    const goals = GoalStorage.getUserGoals(userId)
+    const childGoals = goals.filter(g => g.parent_goal_id === goalId)
+
+    for (const child of childGoals) {
       await this.deleteGoal(userId, child.id)
     }
 
-    // Delete alignments
-    await supabase
-      .from('goal_alignments')
-      .delete()
-      .eq('user_id', userId)
-      .or(`parent_goal_id.eq.${goalId},child_goal_id.eq.${goalId}`)
-
-    // Delete progress logs
-    await supabase
-      .from('goal_progress_logs')
-      .delete()
-      .eq('user_id', userId)
-      .eq('goal_id', goalId)
+    // Delete progress logs for this goal
+    const progressLogs = GoalStorage.getProgressLogs(userId)
+    const filteredLogs = progressLogs.filter(log => log.goal_id !== goalId)
+    GoalStorage.saveProgressLogs(userId, filteredLogs)
 
     // Delete the goal
-    const { error } = await supabase
-      .from('goals')
-      .delete()
-      .eq('user_id', userId)
-      .eq('id', goalId)
-
-    if (error) throw error
+    GoalStorage.removeUserGoal(userId, goalId)
+    console.log('✅ [ENHANCED STUB] Deleted goal:', goalId)
   }
 
   // ============================================================================
   // HIERARCHY MANAGEMENT
   // ============================================================================
 
-  /**
-   * Get hierarchical view of goals (monthly → weekly → daily)
-   */
   static async getGoalHierarchy(userId: string): Promise<GoalHierarchyView> {
-    const [monthlyGoals, weeklyGoals, dailyGoals, alignments] = await Promise.all([
+    console.log('🔥 [ENHANCED STUB] getGoalHierarchy called for userId:', userId)
+
+    const [monthlyGoals, weeklyGoals, dailyGoals] = await Promise.all([
       this.getGoals(userId, { goal_type: ['monthly'] }),
       this.getGoals(userId, { goal_type: ['weekly'] }),
-      this.getGoals(userId, { goal_type: ['daily'] }),
-      this.getGoalAlignments(userId)
+      this.getGoals(userId, { goal_type: ['daily'] })
     ])
 
     return {
       monthly_goals: monthlyGoals,
       weekly_goals: weeklyGoals,
       daily_goals: dailyGoals,
-      alignments
+      alignments: [] // Would need separate alignment tracking
     }
   }
 
-  /**
-   * Get child goals for a parent goal
-   */
   static async getChildGoals(userId: string, parentGoalId: string): Promise<Goal[]> {
-    const { data, error } = await supabase
-      .from('goals')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('parent_goal_id', parentGoalId)
-      .is('archived_at', null)
-      .order('target_date')
+    console.log('🔥 [ENHANCED STUB] getChildGoals called with:', { userId, parentGoalId })
 
-    if (error) throw error
-    return (data || []).map(this.transformGoalFromDb)
+    if (typeof window === 'undefined') {
+      return []
+    }
+
+    const goals = GoalStorage.getUserGoals(userId)
+    const childGoals = goals.filter(g =>
+      g.parent_goal_id === parentGoalId && !g.archived_at
+    ).sort((a, b) => new Date(a.target_date).getTime() - new Date(b.target_date).getTime())
+
+    console.log(`Found ${childGoals.length} child goals`)
+    return childGoals
   }
 
-  /**
-   * Create goal alignment between parent and child
-   */
   static async createGoalAlignment(
     userId: string,
     parentGoalId: string,
@@ -308,39 +366,22 @@ export class GoalsService {
     alignmentStrength = 8,
     contributionPercentage = 25
   ): Promise<GoalAlignment> {
-    const { data, error } = await supabase
-      .from('goal_alignments')
-      .insert({
-        user_id: userId,
-        parent_goal_id: parentGoalId,
-        child_goal_id: childGoalId,
-        alignment_strength: alignmentStrength,
-        contribution_percentage: contributionPercentage
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
+    console.log('Create goal alignment stub called - not implemented yet')
+    throw new Error('Goal alignment creation not yet implemented')
   }
 
-  /**
-   * Get all goal alignments for user
-   */
   static async getGoalAlignments(userId: string): Promise<GoalAlignment[]> {
-    const { data, error } = await supabase
-      .from('goal_alignments')
-      .select('*')
-      .eq('user_id', userId)
-
-    if (error) throw error
-    return data || []
+    console.log('Get goal alignments stub called - returning empty alignments')
+    return []
   }
 
-  /**
-   * Update parent goal progress based on child goals
-   */
   static async updateParentGoalProgress(userId: string, parentGoalId: string): Promise<void> {
+    console.log('🔥 [ENHANCED STUB] updateParentGoalProgress called with:', { userId, parentGoalId })
+
+    if (typeof window === 'undefined') {
+      return
+    }
+
     const childGoals = await this.getChildGoals(userId, parentGoalId)
 
     if (childGoals.length === 0) return
@@ -357,16 +398,21 @@ export class GoalsService {
     await this.updateGoal(userId, parentGoalId, {
       progress_percentage: averageProgress
     })
+
+    console.log(`✅ Updated parent goal progress to ${averageProgress}%`)
   }
 
   // ============================================================================
   // PROGRESS TRACKING
   // ============================================================================
 
-  /**
-   * Log progress for a goal
-   */
   static async logProgress(userId: string, input: GoalProgressUpdate): Promise<GoalProgressLog> {
+    console.log('🔥 [ENHANCED STUB] logProgress called with:', { userId, input })
+
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot log progress on server-side')
+    }
+
     // Get current goal state
     const goal = await this.getGoal(userId, input.goal_id)
     if (!goal) throw new Error('Goal not found')
@@ -377,25 +423,25 @@ export class GoalsService {
       : goal.progress_percentage
 
     // Create progress log
-    const { data: logData, error: logError } = await supabase
-      .from('goal_progress_logs')
-      .insert({
-        goal_id: input.goal_id,
-        user_id: userId,
-        progress_value: input.progress_value,
-        cumulative_value: cumulativeValue,
-        percentage,
-        notes: input.notes,
-        reflection: input.reflection,
-        challenges: input.challenges,
-        next_actions: input.next_actions,
-        mood: input.mood,
-        energy_level: input.energy_level
-      })
-      .select()
-      .single()
+    const progressLog: GoalProgressLog = {
+      id: `progress-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      goal_id: input.goal_id,
+      user_id: userId,
+      progress_value: input.progress_value,
+      cumulative_value: cumulativeValue,
+      percentage,
+      notes: input.notes,
+      reflection: input.reflection,
+      challenges: input.challenges,
+      next_actions: input.next_actions,
+      mood: input.mood,
+      energy_level: input.energy_level,
+      log_date: new Date(),
+      created_at: new Date()
+    }
 
-    if (logError) throw logError
+    // Save progress log
+    GoalStorage.addProgressLog(userId, progressLog)
 
     // Update goal with new progress
     await this.updateGoal(userId, input.goal_id, {
@@ -403,237 +449,146 @@ export class GoalsService {
       progress_percentage: percentage
     })
 
-    return logData
+    console.log('✅ [ENHANCED STUB] Logged progress:', progressLog)
+    return progressLog
   }
 
-  /**
-   * Get progress logs for a goal
-   */
   static async getProgressLogs(userId: string, goalId: string): Promise<GoalProgressLog[]> {
-    const { data, error } = await supabase
-      .from('goal_progress_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('goal_id', goalId)
-      .order('log_date', { ascending: false })
+    console.log('🔥 [ENHANCED STUB] getProgressLogs called with:', { userId, goalId })
 
-    if (error) throw error
-    return data || []
+    if (typeof window === 'undefined') {
+      return []
+    }
+
+    const allLogs = GoalStorage.getProgressLogs(userId)
+    const goalLogs = allLogs
+      .filter(log => log.goal_id === goalId)
+      .sort((a, b) => new Date(b.log_date).getTime() - new Date(a.log_date).getTime())
+
+    console.log(`Found ${goalLogs.length} progress logs for goal`)
+    return goalLogs
   }
 
   // ============================================================================
   // TEMPLATES
   // ============================================================================
 
-  /**
-   * Get goal templates (user's + public)
-   */
   static async getGoalTemplates(userId: string): Promise<GoalTemplate[]> {
-    const { data, error } = await supabase
-      .from('goal_templates')
-      .select('*')
-      .or(`user_id.eq.${userId},is_public.eq.true`)
-      .order('times_used', { ascending: false })
-
-    if (error) throw error
-    return data || []
+    console.log('Goal templates stub called - returning empty templates')
+    return []
   }
 
-  /**
-   * Create goal from template
-   */
   static async createGoalFromTemplate(
     userId: string,
     input: CreateGoalFromTemplateInput
   ): Promise<Goal> {
-    const template = await supabase
-      .from('goal_templates')
-      .select('*')
-      .eq('id', input.template_id)
-      .single()
-
-    if (!template.data) throw new Error('Template not found')
-
-    const t = template.data
-
-    // Calculate target date
-    const startDate = input.start_date || new Date()
-    const targetDate = input.target_date || new Date(
-      startDate.getTime() + t.time_bound_default_days * 24 * 60 * 60 * 1000
-    )
-
-    const goalInput: CreateGoalInput = {
-      title: input.title || t.name,
-      description: t.description,
-      category: t.category,
-      goal_type: t.goal_type,
-
-      specific: input.customizations?.specific || t.specific_template,
-      measurable: input.customizations?.measurable || t.measurable_template,
-      achievable: input.customizations?.achievable || t.achievable_template,
-      relevant: input.customizations?.relevant || t.relevant_template,
-      time_bound: targetDate,
-
-      target_value: input.target_value || t.default_target_value,
-      unit: t.default_unit,
-      start_date: startDate,
-      target_date: targetDate,
-      priority: t.default_priority,
-      milestones: t.suggested_milestones
-    }
-
-    // Update template usage count
-    await supabase
-      .from('goal_templates')
-      .update({ times_used: t.times_used + 1 })
-      .eq('id', input.template_id)
-
-    return this.createGoal(userId, goalInput)
+    console.log('Create goal from template stub called - not implemented yet')
+    throw new Error('Create goal from template not yet implemented')
   }
 
   // ============================================================================
   // STATISTICS AND INSIGHTS
   // ============================================================================
 
-  /**
-   * Get goal statistics
-   */
   static async getGoalStats(userId: string): Promise<GoalStats> {
-    const goals = await this.getGoals(userId)
+    console.log('🔥 [ENHANCED STUB] getGoalStats called for userId:', userId)
+
+    if (typeof window === 'undefined') {
+      return this.getEmptyStats()
+    }
+
+    const goals = GoalStorage.getUserGoals(userId).filter(g => !g.archived_at)
+    console.log(`Calculating stats for ${goals.length} goals`)
+
+    const activeGoals = goals.filter(g => g.status === 'active')
+    const completedGoals = goals.filter(g => g.status === 'completed')
+    const pausedGoals = goals.filter(g => g.status === 'paused')
+    const cancelledGoals = goals.filter(g => g.status === 'cancelled')
+
+    const monthlyGoals = goals.filter(g => g.goal_type === 'monthly')
+    const weeklyGoals = goals.filter(g => g.goal_type === 'weekly')
+    const dailyGoals = goals.filter(g => g.goal_type === 'daily')
+
+    const averageProgress = goals.length > 0
+      ? Math.round(goals.reduce((sum, g) => sum + g.progress_percentage, 0) / goals.length)
+      : 0
+
+    const onTrackGoals = activeGoals.filter(g => this.isGoalOnTrack(g))
+    const behindGoals = activeGoals.filter(g => this.isGoalBehind(g))
+    const aheadGoals = activeGoals.filter(g => this.isGoalAhead(g))
+
+    const dueToday = activeGoals.filter(g => this.isDueToday(g))
+    const dueThisWeek = activeGoals.filter(g => this.isDueThisWeek(g))
+    const overdueGoals = activeGoals.filter(g => this.isOverdue(g))
 
     const stats: GoalStats = {
       total_goals: goals.length,
-      active_goals: goals.filter(g => g.status === 'active').length,
-      completed_goals: goals.filter(g => g.status === 'completed').length,
-      paused_goals: goals.filter(g => g.status === 'paused').length,
-      cancelled_goals: goals.filter(g => g.status === 'cancelled').length,
+      active_goals: activeGoals.length,
+      completed_goals: completedGoals.length,
+      paused_goals: pausedGoals.length,
+      cancelled_goals: cancelledGoals.length,
 
-      monthly_goals: goals.filter(g => g.goal_type === 'monthly').length,
-      weekly_goals: goals.filter(g => g.goal_type === 'weekly').length,
-      daily_goals: goals.filter(g => g.goal_type === 'daily').length,
+      monthly_goals: monthlyGoals.length,
+      weekly_goals: weeklyGoals.length,
+      daily_goals: dailyGoals.length,
 
-      average_progress: Math.round(
-        goals.reduce((sum, g) => sum + g.progress_percentage, 0) / goals.length || 0
-      ),
-      on_track_goals: goals.filter(g => this.isGoalOnTrack(g)).length,
-      behind_goals: goals.filter(g => this.isGoalBehind(g)).length,
-      ahead_goals: goals.filter(g => this.isGoalAhead(g)).length,
+      average_progress: averageProgress,
+      on_track_goals: onTrackGoals.length,
+      behind_goals: behindGoals.length,
+      ahead_goals: aheadGoals.length,
 
-      due_today: goals.filter(g => this.isDueToday(g)).length,
-      due_this_week: goals.filter(g => this.isDueThisWeek(g)).length,
-      overdue_goals: goals.filter(g => this.isOverdue(g)).length,
+      due_today: dueToday.length,
+      due_this_week: dueThisWeek.length,
+      overdue_goals: overdueGoals.length,
 
-      completion_rate_this_month: await this.getCompletionRate(userId, 'month'),
-      completion_rate_last_month: await this.getCompletionRate(userId, 'month', -1),
+      completion_rate_this_month: this.calculateCompletionRate(completedGoals, 'month', 0),
+      completion_rate_last_month: this.calculateCompletionRate(completedGoals, 'month', -1),
 
-      current_daily_streak: await this.getDailyStreak(userId),
-      longest_daily_streak: await this.getLongestDailyStreak(userId)
+      current_daily_streak: this.calculateDailyStreak(dailyGoals),
+      longest_daily_streak: this.calculateLongestDailyStreak(dailyGoals)
     }
 
+    console.log('✅ [ENHANCED STUB] Calculated goal stats:', stats)
     return stats
   }
 
-  /**
-   * Generate AI insights for goals
-   */
-  static async generateInsights(userId: string): Promise<GoalInsight[]> {
-    const goals = await this.getGoals(userId, { status: ['active'] })
-    const insights: GoalInsight[] = []
-
-    for (const goal of goals) {
-      // Check for overdue goals
-      if (this.isOverdue(goal)) {
-        insights.push({
-          type: 'warning',
-          title: 'Overdue Goal',
-          description: `"${goal.title}" is past its target date. Consider adjusting the timeline or breaking it into smaller tasks.`,
-          goal_id: goal.id,
-          priority: 'high',
-          action_required: true,
-          created_at: new Date()
-        })
-      }
-
-      // Check for goals that need breakdown
-      if (goal.goal_type === 'monthly' && !goal.child_goals?.length) {
-        insights.push({
-          type: 'suggestion',
-          title: 'Break Down Monthly Goal',
-          description: `Consider breaking "${goal.title}" into weekly and daily sub-goals for better tracking.`,
-          goal_id: goal.id,
-          priority: 'medium',
-          action_required: false,
-          created_at: new Date()
-        })
-      }
-
-      // Check for milestones approaching
-      const upcomingMilestone = goal.milestones.find(m =>
-        !m.completed &&
-        new Date(goal.start_date.getTime() + m.target_date * 24 * 60 * 60 * 1000) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
-      )
-
-      if (upcomingMilestone) {
-        insights.push({
-          type: 'milestone',
-          title: 'Upcoming Milestone',
-          description: `Milestone "${upcomingMilestone.title}" for "${goal.title}" is due soon.`,
-          goal_id: goal.id,
-          priority: 'medium',
-          action_required: true,
-          created_at: new Date()
-        })
-      }
+  private static getEmptyStats(): GoalStats {
+    return {
+      total_goals: 0,
+      active_goals: 0,
+      completed_goals: 0,
+      paused_goals: 0,
+      cancelled_goals: 0,
+      monthly_goals: 0,
+      weekly_goals: 0,
+      daily_goals: 0,
+      average_progress: 0,
+      on_track_goals: 0,
+      behind_goals: 0,
+      ahead_goals: 0,
+      due_today: 0,
+      due_this_week: 0,
+      overdue_goals: 0,
+      completion_rate_this_month: 0,
+      completion_rate_last_month: 0,
+      current_daily_streak: 0,
+      longest_daily_streak: 0
     }
+  }
 
-    return insights
+  static async generateInsights(userId: string): Promise<GoalInsight[]> {
+    console.log('Generate goal insights stub called - returning empty insights')
+    return []
   }
 
   // ============================================================================
   // HELPER METHODS
   // ============================================================================
 
-  private static transformGoalFromDb(data: any): Goal {
-    return {
-      ...data,
-      start_date: new Date(data.start_date),
-      target_date: new Date(data.target_date),
-      time_bound: new Date(data.time_bound),
-      completion_date: data.completion_date ? new Date(data.completion_date) : undefined,
-      created_at: new Date(data.created_at),
-      updated_at: new Date(data.updated_at),
-      archived_at: data.archived_at ? new Date(data.archived_at) : undefined,
-      tags: data.tags || [],
-      milestones: data.milestones || []
-    }
-  }
-
-  private static processMilestones(milestones: any[]): any[] {
-    return milestones.map(m => ({
-      ...m,
-      id: crypto.randomUUID(),
-      completed: false
-    }))
-  }
-
-  private static validateGoalTypeHierarchy(goalType: GoalType, hierarchyLevel: number): void {
-    const validCombinations = {
-      monthly: [0],
-      weekly: [0, 1],
-      daily: [0, 1, 2],
-      'one-time': [0, 1, 2, 3],
-      'long-term': [0]
-    }
-
-    if (!validCombinations[goalType].includes(hierarchyLevel)) {
-      throw new Error(`Invalid goal type "${goalType}" for hierarchy level ${hierarchyLevel}`)
-    }
-  }
-
   private static isGoalOnTrack(goal: Goal): boolean {
     const now = new Date()
-    const start = goal.start_date
-    const end = goal.target_date
+    const start = new Date(goal.start_date)
+    const end = new Date(goal.target_date)
     const totalDuration = end.getTime() - start.getTime()
     const elapsed = now.getTime() - start.getTime()
     const expectedProgress = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100))
@@ -643,8 +598,8 @@ export class GoalsService {
 
   private static isGoalBehind(goal: Goal): boolean {
     const now = new Date()
-    const start = goal.start_date
-    const end = goal.target_date
+    const start = new Date(goal.start_date)
+    const end = new Date(goal.target_date)
     const totalDuration = end.getTime() - start.getTime()
     const elapsed = now.getTime() - start.getTime()
     const expectedProgress = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100))
@@ -654,8 +609,8 @@ export class GoalsService {
 
   private static isGoalAhead(goal: Goal): boolean {
     const now = new Date()
-    const start = goal.start_date
-    const end = goal.target_date
+    const start = new Date(goal.start_date)
+    const end = new Date(goal.target_date)
     const totalDuration = end.getTime() - start.getTime()
     const elapsed = now.getTime() - start.getTime()
     const expectedProgress = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100))
@@ -665,24 +620,24 @@ export class GoalsService {
 
   private static isDueToday(goal: Goal): boolean {
     const today = new Date().toISOString().split('T')[0]
-    const targetDate = goal.target_date.toISOString().split('T')[0]
-    return targetDate === today && goal.status === 'active'
+    const targetDate = new Date(goal.target_date).toISOString().split('T')[0]
+    return targetDate === today
   }
 
   private static isDueThisWeek(goal: Goal): boolean {
     const now = new Date()
     const endOfWeek = new Date(now)
     endOfWeek.setDate(now.getDate() + (7 - now.getDay()))
-    return goal.target_date <= endOfWeek && goal.status === 'active'
+    return new Date(goal.target_date) <= endOfWeek
   }
 
   private static isOverdue(goal: Goal): boolean {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    return goal.target_date < today && goal.status === 'active'
+    return new Date(goal.target_date) < today
   }
 
-  private static async getCompletionRate(userId: string, period: 'week' | 'month', offset = 0): Promise<number> {
+  private static calculateCompletionRate(completedGoals: Goal[], period: 'week' | 'month', offset: number): number {
     const now = new Date()
     let startDate: Date, endDate: Date
 
@@ -694,40 +649,27 @@ export class GoalsService {
       endDate = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
     }
 
-    const { data, error } = await supabase
-      .from('goals')
-      .select('status')
-      .eq('user_id', userId)
-      .gte('target_date', startDate.toISOString().split('T')[0])
-      .lte('target_date', endDate.toISOString().split('T')[0])
+    const periodCompletions = completedGoals.filter(g => {
+      if (!g.completion_date) return false
+      const completionDate = new Date(g.completion_date)
+      return completionDate >= startDate && completionDate <= endDate
+    })
 
-    if (error || !data) return 0
-
-    const total = data.length
-    const completed = data.filter(g => g.status === 'completed').length
-
-    return total > 0 ? Math.round((completed / total) * 100) : 0
+    // For stub purposes, return length as completion rate
+    return periodCompletions.length
   }
 
-  private static async getDailyStreak(userId: string): Promise<number> {
-    // Get daily goals completed in sequence
-    const { data, error } = await supabase
-      .from('goals')
-      .select('completion_date')
-      .eq('user_id', userId)
-      .eq('goal_type', 'daily')
-      .eq('status', 'completed')
-      .not('completion_date', 'is', null)
-      .order('completion_date', { ascending: false })
-
-    if (error || !data) return 0
+  private static calculateDailyStreak(dailyGoals: Goal[]): number {
+    const completedDailyGoals = dailyGoals
+      .filter(g => g.status === 'completed' && g.completion_date)
+      .sort((a, b) => new Date(b.completion_date!).getTime() - new Date(a.completion_date!).getTime())
 
     let streak = 0
     let currentDate = new Date()
     currentDate.setHours(0, 0, 0, 0)
 
-    for (const goal of data) {
-      const completionDate = new Date(goal.completion_date)
+    for (const goal of completedDailyGoals) {
+      const completionDate = new Date(goal.completion_date!)
       completionDate.setHours(0, 0, 0, 0)
 
       if (completionDate.getTime() === currentDate.getTime()) {
@@ -741,10 +683,9 @@ export class GoalsService {
     return streak
   }
 
-  private static async getLongestDailyStreak(userId: string): Promise<number> {
-    // Implementation would analyze historical daily goal completions
-    // For now, return a placeholder
-    return 0
+  private static calculateLongestDailyStreak(dailyGoals: Goal[]): number {
+    // For stub purposes, return current streak as longest
+    return this.calculateDailyStreak(dailyGoals)
   }
 }
 

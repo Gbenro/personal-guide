@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import { RoutinesService } from '../lib/routinesService-stub'
+import { RoutinesService } from '../lib/routinesService'
 import type {
   RoutineTemplate,
   UserRoutine,

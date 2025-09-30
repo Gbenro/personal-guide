@@ -1,5 +1,52 @@
-// Reflection Service for Personal Guide
-// Handles reflection data management and insights generation
+// Enhanced stub for reflection service with localStorage persistence
+// TODO: Replace with full PostgreSQL implementation
+
+// Simple localStorage-based storage for reflections
+class ReflectionStorage {
+  private static REFLECTIONS_KEY = 'pg_user_reflections'
+
+  static getUserReflections(userId: string): Reflection[] {
+    try {
+      const reflections = localStorage.getItem(`${this.REFLECTIONS_KEY}_${userId}`)
+      return reflections ? JSON.parse(reflections) : []
+    } catch (error) {
+      console.warn('Failed to load reflections from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveUserReflections(userId: string, reflections: Reflection[]): void {
+    try {
+      localStorage.setItem(`${this.REFLECTIONS_KEY}_${userId}`, JSON.stringify(reflections))
+    } catch (error) {
+      console.warn('Failed to save reflections to localStorage:', error)
+    }
+  }
+
+  static addUserReflection(userId: string, reflection: Reflection): void {
+    const existingReflections = this.getUserReflections(userId)
+    const updatedReflections = [...existingReflections, reflection]
+    this.saveUserReflections(userId, updatedReflections)
+  }
+
+  static updateUserReflection(userId: string, reflectionId: string, updates: Partial<Reflection>): Reflection | null {
+    const existingReflections = this.getUserReflections(userId)
+    const reflectionIndex = existingReflections.findIndex(r => r.id === reflectionId)
+
+    if (reflectionIndex === -1) return null
+
+    const updatedReflection = { ...existingReflections[reflectionIndex], ...updates, updated_at: new Date().toISOString() }
+    existingReflections[reflectionIndex] = updatedReflection
+    this.saveUserReflections(userId, existingReflections)
+    return updatedReflection
+  }
+
+  static removeUserReflection(userId: string, reflectionId: string): void {
+    const existingReflections = this.getUserReflections(userId)
+    const updatedReflections = existingReflections.filter(r => r.id !== reflectionId)
+    this.saveUserReflections(userId, updatedReflections)
+  }
+}
 
 export interface Reflection {
   id: string
@@ -45,12 +92,6 @@ export interface ReflectionFilters {
 }
 
 class ReflectionService {
-  private supabase: any // Will be injected when Supabase is available
-
-  constructor(supabaseClient?: any) {
-    this.supabase = supabaseClient
-  }
-
   // Get user's reflections with optional filtering
   async getUserReflections(
     userId: string,
@@ -58,181 +99,172 @@ class ReflectionService {
     limit: number = 50,
     offset: number = 0
   ): Promise<Reflection[]> {
-    if (!this.supabase) {
-      // Return mock data for now
-      return this.getMockReflections(userId)
+    console.log('🔥 [ENHANCED STUB] getUserReflections called for userId:', userId)
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, returning empty array')
+      return []
     }
 
-    try {
-      let query = this.supabase
-        .from('reflections')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1)
+    let reflections = ReflectionStorage.getUserReflections(userId)
+    console.log(`Found ${reflections.length} reflections for user`)
 
-      // Apply filters
-      if (filters?.source_type) {
-        query = query.eq('source_type', filters.source_type)
-      }
-      if (filters?.is_favorite !== undefined) {
-        query = query.eq('is_favorite', filters.is_favorite)
-      }
-      if (filters?.date_range) {
-        query = query
-          .gte('created_at', filters.date_range.start)
-          .lte('created_at', filters.date_range.end)
-      }
-      if (filters?.mood_range) {
-        query = query
-          .gte('mood_rating', filters.mood_range.min)
-          .lte('mood_rating', filters.mood_range.max)
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      return data || []
-    } catch (error) {
-      console.error('Error fetching reflections:', error)
-      throw error
+    // Apply filters
+    if (filters?.source_type) {
+      reflections = reflections.filter(r => r.source_type === filters.source_type)
     }
+    if (filters?.is_favorite !== undefined) {
+      reflections = reflections.filter(r => r.is_favorite === filters.is_favorite)
+    }
+    if (filters?.date_range) {
+      reflections = reflections.filter(r => {
+        const createdAt = new Date(r.created_at)
+        const start = new Date(filters.date_range!.start)
+        const end = new Date(filters.date_range!.end)
+        return createdAt >= start && createdAt <= end
+      })
+    }
+    if (filters?.mood_range) {
+      reflections = reflections.filter(r =>
+        r.mood_rating !== undefined &&
+        r.mood_rating >= filters.mood_range!.min &&
+        r.mood_rating <= filters.mood_range!.max
+      )
+    }
+    if (filters?.tag) {
+      reflections = reflections.filter(r => r.tags.includes(filters.tag!))
+    }
+    if (filters?.theme) {
+      reflections = reflections.filter(r => r.themes?.includes(filters.theme!))
+    }
+
+    // Sort by creation date (newest first)
+    reflections.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    // Apply pagination
+    const paginatedReflections = reflections.slice(offset, offset + limit)
+
+    console.log(`Returning ${paginatedReflections.length} filtered reflections`)
+    return paginatedReflections
   }
 
   // Get reflection statistics
   async getReflectionStats(userId: string): Promise<ReflectionStats> {
-    if (!this.supabase) {
+    console.log('🔥 [ENHANCED STUB] getReflectionStats called for userId:', userId)
+
+    if (typeof window === 'undefined') {
       return this.getMockStats()
     }
 
-    try {
-      const { data: reflections, error } = await this.supabase
-        .from('reflections')
-        .select('*')
-        .eq('user_id', userId)
+    const reflections = ReflectionStorage.getUserReflections(userId)
+    console.log(`Calculating stats for ${reflections.length} reflections`)
 
-      if (error) throw error
-
-      return this.calculateStats(reflections || [])
-    } catch (error) {
-      console.error('Error fetching reflection stats:', error)
-      throw error
-    }
+    return this.calculateStats(reflections)
   }
 
   // Create a new reflection
   async createReflection(reflection: Omit<Reflection, 'id' | 'created_at' | 'updated_at'>): Promise<Reflection> {
-    if (!this.supabase) {
-      // Mock implementation
-      const newReflection: Reflection = {
-        ...reflection,
-        id: `reflection_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        word_count: reflection.content.split(' ').length
-      }
-      return newReflection
+    console.log('🔥 [ENHANCED STUB] createReflection called with:', reflection)
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, cannot create reflection')
+      throw new Error('Cannot create reflection on server-side')
     }
 
-    try {
-      const reflectionData = {
-        ...reflection,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        word_count: reflection.content.split(' ').length
-      }
-
-      const { data, error } = await this.supabase
-        .from('reflections')
-        .insert([reflectionData])
-        .select()
-        .single()
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Error creating reflection:', error)
-      throw error
+    const newReflection: Reflection = {
+      ...reflection,
+      id: `reflection-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      word_count: reflection.content.split(' ').length,
+      insights: reflection.insights || this.extractInsights(reflection.content),
+      themes: reflection.themes || this.extractThemes(reflection.content)
     }
+
+    // Save to localStorage
+    ReflectionStorage.addUserReflection(reflection.user_id, newReflection)
+
+    console.log('✅ [ENHANCED STUB] Created and saved reflection:', newReflection)
+    return newReflection
   }
 
   // Update reflection
   async updateReflection(id: string, updates: Partial<Reflection>): Promise<Reflection> {
-    if (!this.supabase) {
-      throw new Error('Supabase not available for updates')
+    console.log('🔥 [ENHANCED STUB] updateReflection called with:', { id, updates })
+
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot update reflection on server-side')
     }
 
-    try {
-      const updateData = {
-        ...updates,
-        updated_at: new Date().toISOString()
-      }
-
-      if (updates.content) {
-        updateData.word_count = updates.content.split(' ').length
-      }
-
-      const { data, error } = await this.supabase
-        .from('reflections')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single()
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Error updating reflection:', error)
-      throw error
+    const updateData = { ...updates }
+    if (updates.content) {
+      updateData.word_count = updates.content.split(' ').length
     }
+
+    // Find the reflection first to get the user_id
+    const allReflections = ReflectionStorage.getUserReflections(updates.user_id || '')
+    const existingReflection = allReflections.find(r => r.id === id)
+
+    if (!existingReflection) {
+      throw new Error('Reflection not found')
+    }
+
+    const updatedReflection = ReflectionStorage.updateUserReflection(existingReflection.user_id, id, updateData)
+
+    if (!updatedReflection) {
+      throw new Error('Failed to update reflection')
+    }
+
+    console.log('✅ [ENHANCED STUB] Updated reflection:', updatedReflection)
+    return updatedReflection
   }
 
   // Toggle favorite status
   async toggleFavorite(id: string, currentStatus: boolean): Promise<boolean> {
-    if (!this.supabase) {
+    console.log('🔥 [ENHANCED STUB] toggleFavorite called with:', { id, currentStatus })
+
+    if (typeof window === 'undefined') {
       return !currentStatus // Mock toggle
     }
 
-    try {
-      const { data, error } = await this.supabase
-        .from('reflections')
-        .update({
-          is_favorite: !currentStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select('is_favorite')
-        .single()
+    // We need to find the reflection across all users to get the user_id
+    // In a real implementation, we'd have better indexing
+    const storageKeys = Object.keys(localStorage).filter(key => key.startsWith('pg_user_reflections_'))
 
-      if (error) throw error
-      return data.is_favorite
-    } catch (error) {
-      console.error('Error toggling favorite:', error)
-      throw error
+    for (const key of storageKeys) {
+      const userId = key.replace('pg_user_reflections_', '')
+      const reflections = ReflectionStorage.getUserReflections(userId)
+      const reflection = reflections.find(r => r.id === id)
+
+      if (reflection) {
+        const updatedReflection = ReflectionStorage.updateUserReflection(userId, id, {
+          is_favorite: !currentStatus
+        })
+        console.log('✅ [ENHANCED STUB] Toggled favorite status:', !currentStatus)
+        return !currentStatus
+      }
     }
+
+    throw new Error('Reflection not found')
   }
 
   // Delete reflection
-  async deleteReflection(id: string): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase not available for deletion')
+  async deleteReflection(id: string, userId: string): Promise<void> {
+    console.log('🔥 [ENHANCED STUB] deleteReflection called with:', { id, userId })
+
+    if (typeof window === 'undefined') {
+      console.log('Server-side, cannot delete reflection')
+      return
     }
 
-    try {
-      const { error } = await this.supabase
-        .from('reflections')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-    } catch (error) {
-      console.error('Error deleting reflection:', error)
-      throw error
-    }
+    ReflectionStorage.removeUserReflection(userId, id)
+    console.log('✅ [ENHANCED STUB] Deleted reflection:', id)
   }
 
   // Generate insights from journal entry
   async generateReflectionFromJournal(journalEntry: any): Promise<Reflection> {
+    console.log('🔥 [ENHANCED STUB] generateReflectionFromJournal called')
+
     const insights = this.extractInsights(journalEntry.content)
     const themes = this.extractThemes(journalEntry.content)
 
@@ -251,6 +283,8 @@ class ReflectionService {
 
   // Generate insights from chat conversation
   async generateReflectionFromChat(chatMessage: any): Promise<Reflection> {
+    console.log('🔥 [ENHANCED STUB] generateReflectionFromChat called')
+
     const insights = this.extractInsights(chatMessage.content)
     const themes = this.extractThemes(chatMessage.content)
 
@@ -267,32 +301,24 @@ class ReflectionService {
 
   // Search reflections
   async searchReflections(userId: string, query: string, limit: number = 20): Promise<Reflection[]> {
-    if (!this.supabase) {
-      // Mock search
-      const mockData = this.getMockReflections(userId)
-      const lowerQuery = query.toLowerCase()
-      return mockData.filter(reflection =>
-        reflection.content.toLowerCase().includes(lowerQuery) ||
-        reflection.title?.toLowerCase().includes(lowerQuery) ||
-        reflection.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
-      ).slice(0, limit)
+    console.log('🔥 [ENHANCED STUB] searchReflections called with:', { userId, query, limit })
+
+    if (typeof window === 'undefined') {
+      return []
     }
 
-    try {
-      const { data, error } = await this.supabase
-        .from('reflections')
-        .select('*')
-        .eq('user_id', userId)
-        .or(`content.ilike.%${query}%,title.ilike.%${query}%,tags.cs.{${query}}`)
-        .order('created_at', { ascending: false })
-        .limit(limit)
+    const reflections = ReflectionStorage.getUserReflections(userId)
+    const lowerQuery = query.toLowerCase()
 
-      if (error) throw error
-      return data || []
-    } catch (error) {
-      console.error('Error searching reflections:', error)
-      throw error
-    }
+    const matchingReflections = reflections.filter(reflection =>
+      reflection.content.toLowerCase().includes(lowerQuery) ||
+      reflection.title?.toLowerCase().includes(lowerQuery) ||
+      reflection.tags.some(tag => tag.toLowerCase().includes(lowerQuery)) ||
+      reflection.themes?.some(theme => theme.toLowerCase().includes(lowerQuery))
+    ).slice(0, limit)
+
+    console.log(`Found ${matchingReflections.length} matching reflections`)
+    return matchingReflections
   }
 
   // Private helper methods
@@ -374,11 +400,17 @@ class ReflectionService {
       return acc
     }, {} as Record<string, number>)
 
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const recentInsights = reflections.filter(r =>
+      r.insights && r.insights.length > 0 &&
+      new Date(r.created_at) > oneWeekAgo
+    )
+
     return {
       total_reflections: reflections.length,
       favorite_count: reflections.filter(r => r.is_favorite).length,
       average_mood: moodRatings.length > 0 ?
-        moodRatings.reduce((sum, rating) => sum + rating, 0) / moodRatings.length : 0,
+        Math.round((moodRatings.reduce((sum, rating) => sum + rating, 0) / moodRatings.length) * 10) / 10 : 0,
       most_common_tags: Object.entries(tagCounts)
         .sort(([,a], [,b]) => b - a)
         .slice(0, 5)
@@ -388,87 +420,19 @@ class ReflectionService {
         .slice(0, 5)
         .map(([theme]) => theme),
       source_breakdown: sourceCounts,
-      recent_insights_count: reflections.filter(r =>
-        r.insights && r.insights.length > 0 &&
-        new Date(r.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      ).length
+      recent_insights_count: recentInsights.length
     }
-  }
-
-  private getMockReflections(userId: string): Reflection[] {
-    return [
-      {
-        id: '1',
-        user_id: userId,
-        title: 'Morning Meditation Insights',
-        content: 'Today\'s meditation brought clarity about my priorities. I noticed how my mind keeps jumping to work tasks even in quiet moments. This awareness itself is progress - recognizing the pattern is the first step to changing it.',
-        source_type: 'journal',
-        insights: [
-          'Mind tends to default to work thoughts during quiet time',
-          'Awareness of mental patterns is developing',
-          'Meditation helping with priority clarity'
-        ],
-        mood_rating: 7,
-        tags: ['meditation', 'awareness', 'work-life-balance'],
-        themes: ['mindfulness', 'self-awareness'],
-        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        is_favorite: true,
-        word_count: 42
-      },
-      {
-        id: '2',
-        user_id: userId,
-        content: 'Had an interesting conversation with the AI about goal setting. Realized I\'ve been setting goals based on what I think I should want rather than what I actually want. This disconnect might explain why I struggle with motivation.',
-        source_type: 'chat',
-        insights: [
-          'Goals misaligned with authentic desires',
-          'External expectations influencing goal setting',
-          'Need to reconnect with personal values'
-        ],
-        mood_rating: 6,
-        tags: ['goals', 'self-discovery', 'motivation'],
-        themes: ['authenticity', 'self-awareness'],
-        created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-        is_favorite: false,
-        word_count: 38
-      },
-      {
-        id: '3',
-        user_id: userId,
-        title: 'Exercise Habit Breakthrough',
-        content: 'After 10 days of consistent exercise, I\'m noticing significant changes not just physically but mentally. My mood is more stable, I\'m sleeping better, and I have more energy throughout the day. The compound effect of small daily actions is becoming evident.',
-        source_type: 'habit',
-        insights: [
-          'Consistent exercise improving overall well-being',
-          'Physical habits impact mental state significantly',
-          'Small daily actions create compound benefits'
-        ],
-        mood_rating: 8,
-        tags: ['exercise', 'habits', 'well-being'],
-        themes: ['wellness', 'growth'],
-        created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        is_favorite: true,
-        word_count: 45
-      }
-    ]
   }
 
   private getMockStats(): ReflectionStats {
     return {
-      total_reflections: 3,
-      favorite_count: 2,
-      average_mood: 7.0,
-      most_common_tags: ['meditation', 'awareness', 'goals', 'exercise', 'habits'],
-      most_common_themes: ['self-awareness', 'mindfulness', 'wellness', 'growth'],
-      source_breakdown: {
-        journal: 1,
-        chat: 1,
-        habit: 1
-      },
-      recent_insights_count: 3
+      total_reflections: 0,
+      favorite_count: 0,
+      average_mood: 0,
+      most_common_tags: [],
+      most_common_themes: [],
+      source_breakdown: {},
+      recent_insights_count: 0
     }
   }
 }
@@ -489,10 +453,26 @@ export async function createReflection(reflection: Omit<Reflection, 'id' | 'crea
   return reflectionService.createReflection(reflection)
 }
 
+export async function updateReflection(id: string, updates: Partial<Reflection>) {
+  return reflectionService.updateReflection(id, updates)
+}
+
 export async function toggleReflectionFavorite(id: string, currentStatus: boolean) {
   return reflectionService.toggleFavorite(id, currentStatus)
 }
 
+export async function deleteReflection(id: string, userId: string) {
+  return reflectionService.deleteReflection(id, userId)
+}
+
 export async function searchReflections(userId: string, query: string) {
   return reflectionService.searchReflections(userId, query)
+}
+
+export async function generateReflectionFromJournal(journalEntry: any) {
+  return reflectionService.generateReflectionFromJournal(journalEntry)
+}
+
+export async function generateReflectionFromChat(chatMessage: any) {
+  return reflectionService.generateReflectionFromChat(chatMessage)
 }
