@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { Goal, GoalType } from '@/types/goals'
-import { useUpdateGoal, useLogGoalProgress } from '@/hooks/useGoals'
+import { useUpdateGoal, useLogGoalProgress, useDeleteGoal, useGoals } from '@/hooks/useGoals'
 import { Button } from '@/components/ui/button'
 
 interface GoalCardProps {
@@ -26,9 +26,12 @@ export function GoalCard({
 }: GoalCardProps) {
   const [showProgress, setShowProgress] = useState(false)
   const [progressValue, setProgressValue] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const updateGoalMutation = useUpdateGoal()
   const logProgressMutation = useLogGoalProgress()
+  const deleteGoalMutation = useDeleteGoal()
+  const { data: allGoals } = useGoals(goal.user_id)
 
   const levelColors = {
     0: 'border-blue-200 bg-blue-50', // Monthly
@@ -91,6 +94,26 @@ export function GoalCard({
     }
   }
 
+  const handleDelete = async () => {
+    try {
+      await deleteGoalMutation.mutateAsync({
+        userId: goal.user_id,
+        goalId: goal.id
+      })
+      setShowDeleteConfirm(false)
+    } catch (error) {
+      console.error('Failed to delete goal:', error)
+      alert('Failed to delete goal. Please try again.')
+    }
+  }
+
+  const getParentGoal = () => {
+    if (!goal.parent_goal_id || !allGoals) return null
+    return allGoals.find(g => g.id === goal.parent_goal_id)
+  }
+
+  const parentGoal = getParentGoal()
+
   const targetDateStatus = getTargetDateStatus()
 
   if (compact) {
@@ -142,6 +165,13 @@ export function GoalCard({
               {goal.status}
             </span>
           </div>
+          {parentGoal && (
+            <div className="mb-2 flex items-center gap-2 text-sm text-gray-600">
+              <span>🔗</span>
+              <span>Child of:</span>
+              <span className="font-medium text-blue-600">{parentGoal.title}</span>
+            </div>
+          )}
           {goal.description && (
             <p className="text-gray-600 text-sm">{goal.description}</p>
           )}
@@ -251,6 +281,15 @@ export function GoalCard({
             + Add {level === 0 ? 'Weekly' : 'Daily'} Goal
           </Button>
         )}
+
+        <Button
+          size="sm"
+          onClick={() => setShowDeleteConfirm(true)}
+          variant="outline"
+          className="text-red-600 border-red-300 hover:bg-red-50"
+        >
+          🗑️ Delete
+        </Button>
       </div>
 
       {/* Progress Input */}
@@ -271,6 +310,38 @@ export function GoalCard({
             <Button size="sm" variant="outline" onClick={() => setShowProgress(false)}>
               Cancel
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Goal</h3>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to delete "{goal.title}"? This action cannot be undone.
+              {hasChildren && (
+                <span className="text-red-600 font-medium">
+                  <br />Warning: This will also delete all child goals.
+                </span>
+              )}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDelete}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteGoalMutation.isPending}
+              >
+                {deleteGoalMutation.isPending ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

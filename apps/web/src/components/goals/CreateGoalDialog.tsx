@@ -28,6 +28,7 @@ export function CreateGoalDialog({
     energy_required: 3,
     tags: []
   })
+  const [useSmartCriteria, setUseSmartCriteria] = useState(false)
 
   const createGoalMutation = useCreateGoal()
   const { data: templates } = useGoalTemplates(userId)
@@ -42,6 +43,7 @@ export function CreateGoalDialog({
         energy_required: 3,
         tags: []
       })
+      setUseSmartCriteria(false)
     }
   }, [open, defaultGoalType, parentGoalId])
 
@@ -49,9 +51,15 @@ export function CreateGoalDialog({
     e.preventDefault()
 
     // Validate required fields
-    if (!formData.title || !formData.specific || !formData.measurable ||
-        !formData.achievable || !formData.relevant || !formData.target_date) {
-      alert('Please fill in all required SMART criteria fields')
+    if (!formData.title || !formData.target_date) {
+      alert('Please fill in title and target date')
+      return
+    }
+
+    // Validate SMART criteria if enabled
+    if (useSmartCriteria && (!formData.specific || !formData.measurable ||
+        !formData.achievable || !formData.relevant)) {
+      alert('Please fill in all SMART criteria fields')
       return
     }
 
@@ -62,10 +70,10 @@ export function CreateGoalDialog({
           ...formData,
           title: formData.title!,
           category: formData.category || 'Other',
-          specific: formData.specific!,
-          measurable: formData.measurable!,
-          achievable: formData.achievable!,
-          relevant: formData.relevant!,
+          specific: useSmartCriteria ? formData.specific! : `Goal: ${formData.title}`,
+          measurable: useSmartCriteria ? formData.measurable! : 'Progress will be tracked',
+          achievable: useSmartCriteria ? formData.achievable! : 'This goal is achievable',
+          relevant: useSmartCriteria ? formData.relevant! : 'This goal is relevant to my objectives',
           time_bound: new Date(formData.target_date!),
           target_date: new Date(formData.target_date!)
         } as CreateGoalInput
@@ -84,7 +92,7 @@ export function CreateGoalDialog({
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">🎯 Create SMART Goal</h2>
+            <h2 className="text-2xl font-bold text-gray-900">🎯 Create Goal</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl"
@@ -92,8 +100,25 @@ export function CreateGoalDialog({
               ×
             </button>
           </div>
+          <div className="mt-4 flex items-center gap-4">
+            <div className="flex items-center">
+              <input
+                id="smart-toggle"
+                type="checkbox"
+                checked={useSmartCriteria}
+                onChange={(e) => setUseSmartCriteria(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="smart-toggle" className="ml-2 text-sm font-medium text-gray-700">
+                Use detailed SMART criteria
+              </label>
+            </div>
+          </div>
           <p className="text-gray-600 mt-2">
-            Create a goal using the SMART framework: Specific, Measurable, Achievable, Relevant, Time-bound
+            {useSmartCriteria
+              ? "Create a goal using the SMART framework: Specific, Measurable, Achievable, Relevant, Time-bound"
+              : "Create a simple goal with basic information"
+            }
           </p>
         </div>
 
@@ -168,8 +193,9 @@ export function CreateGoalDialog({
           </div>
 
           {/* SMART Criteria */}
-          <div className="bg-blue-50 rounded-lg p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">🎯 SMART Criteria</h3>
+          {useSmartCriteria && (
+            <div className="bg-blue-50 rounded-lg p-6 space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">🎯 SMART Criteria</h3>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -226,7 +252,8 @@ export function CreateGoalDialog({
                 required
               />
             </div>
-          </div>
+            </div>
+          )}
 
           {/* Measurement Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
