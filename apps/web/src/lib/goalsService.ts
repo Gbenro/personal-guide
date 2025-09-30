@@ -10,7 +10,19 @@ class GoalStorage {
   static getUserGoals(userId: string): Goal[] {
     try {
       const goals = localStorage.getItem(`${this.GOALS_KEY}_${userId}`)
-      return goals ? JSON.parse(goals) : []
+      const parsedGoals = goals ? JSON.parse(goals) : []
+
+      // Transform date strings back to Date objects
+      return parsedGoals.map((goal: any) => ({
+        ...goal,
+        start_date: new Date(goal.start_date),
+        target_date: new Date(goal.target_date),
+        time_bound: new Date(goal.time_bound),
+        completion_date: goal.completion_date ? new Date(goal.completion_date) : undefined,
+        created_at: new Date(goal.created_at),
+        updated_at: new Date(goal.updated_at),
+        archived_at: goal.archived_at ? new Date(goal.archived_at) : undefined
+      }))
     } catch (error) {
       console.warn('Failed to load goals from localStorage:', error)
       return []
@@ -52,7 +64,14 @@ class GoalStorage {
   static getProgressLogs(userId: string): GoalProgressLog[] {
     try {
       const logs = localStorage.getItem(`${this.PROGRESS_KEY}_${userId}`)
-      return logs ? JSON.parse(logs) : []
+      const parsedLogs = logs ? JSON.parse(logs) : []
+
+      // Transform date strings back to Date objects
+      return parsedLogs.map((log: any) => ({
+        ...log,
+        log_date: new Date(log.log_date),
+        created_at: new Date(log.created_at)
+      }))
     } catch (error) {
       console.warn('Failed to load progress logs from localStorage:', error)
       return []

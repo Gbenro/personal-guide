@@ -10,7 +10,16 @@ class RoutineStorage {
   static getUserRoutines(userId: string): UserRoutine[] {
     try {
       const routines = localStorage.getItem(`${this.ROUTINES_KEY}_${userId}`)
-      return routines ? JSON.parse(routines) : []
+      const parsedRoutines = routines ? JSON.parse(routines) : []
+
+      // Transform date strings back to Date objects
+      return parsedRoutines.map((routine: any) => ({
+        ...routine,
+        created_at: new Date(routine.created_at),
+        updated_at: new Date(routine.updated_at),
+        archived_at: routine.archived_at ? new Date(routine.archived_at) : undefined,
+        last_completed_at: routine.last_completed_at ? new Date(routine.last_completed_at) : undefined
+      }))
     } catch (error) {
       console.warn('Failed to load routines from localStorage:', error)
       return []
