@@ -40,6 +40,18 @@ class RoutineStorage {
     this.saveUserRoutines(userId, updatedRoutines)
   }
 
+  static updateUserRoutine(userId: string, routineId: string, updates: Partial<UserRoutine>): UserRoutine | null {
+    const existingRoutines = this.getUserRoutines(userId)
+    const routineIndex = existingRoutines.findIndex(r => r.id === routineId)
+
+    if (routineIndex === -1) return null
+
+    const updatedRoutine = { ...existingRoutines[routineIndex], ...updates, updated_at: new Date() }
+    existingRoutines[routineIndex] = updatedRoutine
+    this.saveUserRoutines(userId, existingRoutines)
+    return updatedRoutine
+  }
+
   static removeUserRoutine(userId: string, routineId: string): void {
     const existingRoutines = this.getUserRoutines(userId)
     const updatedRoutines = existingRoutines.filter(r => r.id !== routineId)
@@ -239,8 +251,20 @@ export class RoutinesService {
   }
 
   static async updateUserRoutine(userId: string, routineId: string, updates: UpdateUserRoutineInput): Promise<UserRoutine> {
-    console.log('Update user routine stub called - not implemented yet')
-    throw new Error('Update routine not yet implemented')
+    console.log('🔥 [ENHANCED STUB] updateUserRoutine called with:', { userId, routineId, updates })
+
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot update routine on server-side')
+    }
+
+    const updatedRoutine = RoutineStorage.updateUserRoutine(userId, routineId, updates)
+
+    if (!updatedRoutine) {
+      throw new Error('Routine not found')
+    }
+
+    console.log('✅ [ENHANCED STUB] Updated routine:', updatedRoutine)
+    return updatedRoutine
   }
 
   static async deleteUserRoutine(userId: string, routineId: string): Promise<void> {
