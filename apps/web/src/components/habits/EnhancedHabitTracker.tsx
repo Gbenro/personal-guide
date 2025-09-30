@@ -458,27 +458,27 @@ export default function EnhancedHabitTracker() {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white bg-opacity-20 rounded-lg p-3">
+            <div className="bg-black bg-opacity-20 rounded-lg p-3 border border-white border-opacity-20">
               <div className="text-2xl font-bold text-white">{finalStats.completedToday}/{finalStats.totalHabits}</div>
-              <div className="text-sm text-white font-medium">Today's Progress</div>
+              <div className="text-sm text-blue-100 font-medium">Today's Progress</div>
             </div>
-            <div className="bg-white bg-opacity-20 rounded-lg p-3">
+            <div className="bg-black bg-opacity-20 rounded-lg p-3 border border-white border-opacity-20">
               <div className="text-2xl font-bold flex items-center text-white">
                 <FireSolidIcon className="w-6 h-6 text-orange-300 mr-1" />
                 {finalStats.averageStreak}
               </div>
-              <div className="text-sm text-white font-medium">Avg Streak</div>
+              <div className="text-sm text-blue-100 font-medium">Avg Streak</div>
             </div>
-            <div className="bg-white bg-opacity-20 rounded-lg p-3">
+            <div className="bg-black bg-opacity-20 rounded-lg p-3 border border-white border-opacity-20">
               <div className="text-2xl font-bold text-white">{finalStats.completionRate}%</div>
-              <div className="text-sm text-white font-medium">Completion Rate</div>
+              <div className="text-sm text-blue-100 font-medium">Completion Rate</div>
             </div>
-            <div className="bg-white bg-opacity-20 rounded-lg p-3">
+            <div className="bg-black bg-opacity-20 rounded-lg p-3 border border-white border-opacity-20">
               <div className="text-2xl font-bold flex items-center text-white">
                 <TrophySolidIcon className="w-6 h-6 text-yellow-300 mr-1" />
                 {finalStats.longestStreak}
               </div>
-              <div className="text-sm text-white font-medium">Best Streak</div>
+              <div className="text-sm text-blue-100 font-medium">Best Streak</div>
             </div>
           </div>
         </div>
@@ -511,11 +511,11 @@ export default function EnhancedHabitTracker() {
             </div>
 
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">View:</span>
+              <span className="text-sm text-gray-700">View:</span>
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
+                  viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 <div className="grid grid-cols-2 gap-1">
@@ -527,7 +527,7 @@ export default function EnhancedHabitTracker() {
               <button
                 onClick={() => setViewMode('list')}
                 className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
+                  viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 <div className="space-y-1">
@@ -548,7 +548,7 @@ export default function EnhancedHabitTracker() {
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
                 {filterCategory === 'all' ? 'No habits yet' : `No ${filterCategory} habits`}
               </h3>
-              <p className="text-gray-500 mb-6 max-w-md mx-auto">
+              <p className="text-gray-700 mb-6 max-w-md mx-auto">
                 Start building positive habits that will transform your daily routine and help you achieve your goals.
               </p>
               <button
@@ -603,7 +603,7 @@ export default function EnhancedHabitTracker() {
                             />
                           ) : (
                             <CheckCircleIcon
-                              className="h-12 w-12 text-gray-400 hover:text-gray-600"
+                              className="h-12 w-12 text-gray-500 hover:text-gray-700"
                               style={{
                                 borderColor: habit.color,
                                 borderWidth: '2px'
@@ -654,7 +654,7 @@ export default function EnhancedHabitTracker() {
                         </div>
 
                         {habit.description && viewMode === 'grid' && (
-                          <p className="text-sm text-gray-500 mb-2">{habit.description}</p>
+                          <p className="text-sm text-gray-700 mb-2">{habit.description}</p>
                         )}
 
                         {/* Enhanced streak display */}
@@ -669,13 +669,13 @@ export default function EnhancedHabitTracker() {
                           )}
 
                           {habit.completionRate !== undefined && habit.completionRate > 0 && (
-                            <div className="text-gray-500">
+                            <div className="text-gray-700">
                               {habit.completionRate}% rate
                             </div>
                           )}
 
                           {habit.streak.longest_streak > 0 && habit.streak.longest_streak > habit.streak.current_streak && (
-                            <div className="flex items-center space-x-1 text-gray-500">
+                            <div className="flex items-center space-x-1 text-gray-600">
                               <TrophyIcon className="h-3 w-3" />
                               <span className="text-xs">Best: {habit.streak.longest_streak}</span>
                             </div>
@@ -684,7 +684,7 @@ export default function EnhancedHabitTracker() {
 
                         {/* Difficulty and time indicators */}
                         {viewMode === 'grid' && (
-                          <div className="flex items-center justify-center space-x-2 mt-2 text-xs text-gray-500">
+                          <div className="flex items-center justify-center space-x-2 mt-2 text-xs text-gray-600">
                             {habit.difficulty === 'easy' && <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">Easy</span>}
                             {habit.difficulty === 'medium' && <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">Medium</span>}
                             {habit.difficulty === 'hard' && <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full">Hard</span>}
