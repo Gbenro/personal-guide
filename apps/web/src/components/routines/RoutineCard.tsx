@@ -58,6 +58,15 @@ export function RoutineCard({ routine, onEdit }: RoutineCardProps) {
 
   const isRoutineActive = !!activeSession && activeSession.status === 'active'
 
+  // Debug logging
+  console.log('RoutineCard debug:', {
+    routineId: routine.id,
+    routineName: routine.name,
+    activeSession,
+    isRoutineActive,
+    sessionStatus: activeSession?.status
+  })
+
   return (
     <div className={`bg-white rounded-lg border ${!routine.is_active ? 'opacity-60' : ''} hover:shadow-md transition-shadow`}>
       {/* Header */}
@@ -142,6 +151,14 @@ export function RoutineCard({ routine, onEdit }: RoutineCardProps) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Debug Info */}
+        <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
+          <div>Active Session: {activeSession ? '✅ YES' : '❌ NO'}</div>
+          <div>Session Status: {activeSession?.status || 'N/A'}</div>
+          <div>Is Routine Active: {isRoutineActive ? '✅ YES' : '❌ NO'}</div>
+          <div>Routine ID: {routine.id}</div>
         </div>
 
         {/* Actions */}

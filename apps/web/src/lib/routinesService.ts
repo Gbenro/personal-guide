@@ -398,6 +398,11 @@ export class RoutinesService {
     RoutineStorage.addRoutineSession(userId, newSession)
 
     console.log('✅ [ENHANCED STUB] Started routine session:', newSession)
+
+    // Additional debug logging
+    const savedSessions = RoutineStorage.getRoutineSessions(userId)
+    console.log('All sessions after creation:', savedSessions)
+
     return newSession
   }
 
@@ -409,11 +414,15 @@ export class RoutinesService {
     }
 
     const sessions = RoutineStorage.getRoutineSessions(userId)
+    console.log('All sessions for user:', sessions)
+
     const activeSession = sessions.find(s =>
       s.routine_id === routineId &&
       (s.status === 'active' || s.status === 'paused')
     )
 
+    console.log('Looking for routine:', routineId)
+    console.log('Sessions matching routine:', sessions.filter(s => s.routine_id === routineId))
     console.log('Found active session:', activeSession ? activeSession.id : 'none')
     return activeSession || null
   }
