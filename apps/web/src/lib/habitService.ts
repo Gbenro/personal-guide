@@ -273,8 +273,121 @@ export async function undoHabitCompletion(habitId: string, userId: string): Prom
 }
 
 export async function calculateStreak(habitId: string, userId: string): Promise<HabitStreak | null> {
-  console.log('Calculate streak stub called - not implemented yet')
-  return null
+  console.log('🔥 [ENHANCED STUB] calculateStreak called with:', { habitId, userId })
+
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    // Get all completions for this specific habit
+    const allCompletions = HabitStorage.getCompletions(userId)
+    const habitCompletions = allCompletions.filter(c => c.habit_id === habitId)
+
+    if (habitCompletions.length === 0) {
+      return {
+        habit_id: habitId,
+        current_streak: 0,
+        longest_streak: 0,
+        last_completed: null,
+        total_completions: 0,
+        weekly_streak: 0,
+        monthly_streak: 0,
+        streak_percentage: 0,
+        days_since_start: 0,
+        completion_rate: 0,
+        is_at_risk: false,
+        next_milestone: 7,
+        streak_health: 'critical'
+      }
+    }
+
+    // Normalize dates to start of day for accurate comparison
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Convert completion dates to normalized timestamps and sort
+    const completionDates = habitCompletions.map(completion => {
+      const date = new Date(completion.completed_at)
+      date.setHours(0, 0, 0, 0)
+      return date.getTime()
+    }).sort((a, b) => b - a) // Most recent first
+
+    // Remove duplicates (multiple completions on same day count as one)
+    const uniqueCompletionDates = [...new Set(completionDates)]
+
+    const lastCompleted = new Date(uniqueCompletionDates[0])
+    const daysSinceLastCompletion = Math.floor(
+      (today.getTime() - lastCompleted.getTime()) / (1000 * 60 * 60 * 24)
+    )
+
+    // Calculate current streak
+    let currentStreak = 0
+
+    // Current streak logic: must be completed today or yesterday to maintain
+    if (daysSinceLastCompletion <= 1) {
+      currentStreak = 1
+
+      // Count consecutive days backwards from the most recent completion
+      let checkDate = lastCompleted.getTime()
+      for (let i = 1; i < uniqueCompletionDates.length; i++) {
+        const prevDate = uniqueCompletionDates[i]
+        const expectedPrevDate = checkDate - (24 * 60 * 60 * 1000) // Previous day
+
+        if (prevDate === expectedPrevDate) {
+          currentStreak++
+          checkDate = prevDate
+        } else {
+          break // Streak broken
+        }
+      }
+    }
+
+    // Calculate longest streak by finding the longest consecutive sequence
+    let longestStreak = 0
+    let tempStreak = 1
+
+    for (let i = 0; i < uniqueCompletionDates.length - 1; i++) {
+      const currentDate = uniqueCompletionDates[i]
+      const nextDate = uniqueCompletionDates[i + 1]
+      const dayDiff = Math.floor((currentDate - nextDate) / (1000 * 60 * 60 * 24))
+
+      if (dayDiff === 1) {
+        tempStreak++
+      } else {
+        longestStreak = Math.max(longestStreak, tempStreak)
+        tempStreak = 1
+      }
+    }
+    longestStreak = Math.max(longestStreak, tempStreak) // Don't forget the last streak
+
+    // Calculate additional metrics
+    const isAtRisk = daysSinceLastCompletion >= 2 && currentStreak > 0
+    const nextMilestone = currentStreak < 7 ? 7 : currentStreak < 30 ? 30 : currentStreak < 100 ? 100 : currentStreak + 100
+
+    let streakHealth: 'excellent' | 'good' | 'warning' | 'critical' = 'critical'
+    if (currentStreak >= 30) streakHealth = 'excellent'
+    else if (currentStreak >= 7) streakHealth = 'good'
+    else if (currentStreak >= 3) streakHealth = 'warning'
+
+    const result: HabitStreak = {
+      habit_id: habitId,
+      current_streak: currentStreak,
+      longest_streak: longestStreak,
+      last_completed: lastCompleted,
+      total_completions: habitCompletions.length,
+      is_at_risk: isAtRisk,
+      next_milestone: nextMilestone,
+      streak_health: streakHealth
+    }
+
+    console.log('✅ [ENHANCED STUB] Calculated streak:', result)
+    return result
+
+  } catch (error) {
+    console.error('Error calculating streak:', error)
+    return null
+  }
 }
 
 export async function getHabitCompletionsRange(
@@ -282,9 +395,45 @@ export async function getHabitCompletionsRange(
   userId: string,
   startDate: Date,
   endDate: Date
-): Promise<HabitCompletion[]> {
-  console.log('Get habit completions range stub called - not implemented yet')
-  return []
+): Promise<Record<string, number>> {
+  console.log('🔥 [ENHANCED STUB] getHabitCompletionsRange called with:', { habitId, userId, startDate, endDate })
+
+  if (typeof window === 'undefined') {
+    return {}
+  }
+
+  try {
+    const allCompletions = HabitStorage.getCompletions(userId)
+    const habitCompletions = allCompletions.filter(c => c.habit_id === habitId)
+
+    // Create a map of date strings to completion counts
+    const completionMap: Record<string, number> = {}
+
+    // Initialize all dates in range to 0
+    const currentDate = new Date(startDate)
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0]
+      completionMap[dateStr] = 0
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+
+    // Count completions for each date
+    habitCompletions.forEach(completion => {
+      const completionDate = new Date(completion.completed_at)
+      const dateStr = completionDate.toISOString().split('T')[0]
+
+      if (completionDate >= startDate && completionDate <= endDate) {
+        completionMap[dateStr] = (completionMap[dateStr] || 0) + 1
+      }
+    })
+
+    console.log('✅ [ENHANCED STUB] Calculated completion range:', completionMap)
+    return completionMap
+
+  } catch (error) {
+    console.error('Error getting habit completions range:', error)
+    return {}
+  }
 }
 
 export async function getHabitInsights(habitId: string, userId: string): Promise<any> {
@@ -317,9 +466,20 @@ export interface HabitEntry {
 }
 
 export interface HabitStreak {
-  current: number
-  longest: number
-  lastCompleted?: string
+  habit_id: string
+  current_streak: number
+  longest_streak: number
+  last_completed: Date | null
+  total_completions: number
+  // Enhanced streak data
+  weekly_streak?: number
+  monthly_streak?: number
+  streak_percentage?: number
+  days_since_start?: number
+  completion_rate?: number
+  is_at_risk?: boolean
+  next_milestone?: number
+  streak_health?: 'excellent' | 'good' | 'warning' | 'critical'
 }
 
 export interface HabitSearchFilters {

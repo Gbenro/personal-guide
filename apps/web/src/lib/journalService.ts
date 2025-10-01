@@ -488,14 +488,14 @@ export async function getJournalStats(userId: string): Promise<{
   console.log('🔥 [ENHANCED STUB] getJournalStats called for userId:', userId)
 
   if (typeof window === 'undefined') {
-    return this.getEmptyJournalStats()
+    return getEmptyJournalStats()
   }
 
   const entries = JournalStorage.getJournalEntries(userId)
   console.log(`Calculating journal stats for ${entries.length} entries`)
 
   if (entries.length === 0) {
-    return this.getEmptyJournalStats()
+    return getEmptyJournalStats()
   }
 
   const now = new Date()

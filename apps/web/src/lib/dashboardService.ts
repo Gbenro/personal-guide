@@ -65,12 +65,12 @@ export async function getDashboardData(userId: string): Promise<{
         const completedToday = todayCompletions.some(c => c.habit_id === habit.id)
 
         // Calculate days since last completion
-        const daysSinceLastCompletion = streak.last_completed
+        const daysSinceLastCompletion = streak?.last_completed
           ? Math.floor((Date.now() - new Date(streak.last_completed).getTime()) / (1000 * 60 * 60 * 24))
           : Infinity
 
         // Habit is at risk if not completed in 2+ days and has an active streak
-        const isAtRisk = daysSinceLastCompletion >= 2 && streak.current_streak > 0
+        const isAtRisk = daysSinceLastCompletion >= 2 && (streak?.current_streak || 0) > 0
 
         return {
           ...habit,
@@ -136,7 +136,7 @@ function calculateDashboardStats(
   const pendingTodayCount = totalActiveHabits - completedTodayCount
   const dailyCompletionRate = totalActiveHabits > 0 ? (completedTodayCount / totalActiveHabits) * 100 : 0
 
-  const streaks = habits.map(h => h.streak.current_streak).filter(s => s > 0)
+  const streaks = habits.map(h => h.streak?.current_streak || 0).filter(s => s > 0)
   const longestCurrentStreak = streaks.length > 0 ? Math.max(...streaks) : 0
   const totalActiveStreaks = streaks.length
 
