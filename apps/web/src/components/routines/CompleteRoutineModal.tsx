@@ -49,7 +49,7 @@ export function CompleteRoutineModal({
         focus_level: formData.focus_level,
         rating: formData.rating,
         notes: formData.notes.trim() || undefined,
-        tags: ['Routine', routine.category, routine.name],
+        tags: ['Ritual', routine.category, routine.name],
         interruptions_count: formData.interruptions_count
       }
 
@@ -70,11 +70,11 @@ export function CompleteRoutineModal({
       <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">🏁 Complete Routine</h2>
+            <h2 className="text-xl font-semibold text-gray-900">🏁 Complete Ritual</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
           </div>
           <p className="text-gray-600 mt-2">
-            How did your <strong>{routine.name}</strong> routine go?
+            How did your <strong>{routine.name}</strong> ritual go?
           </p>
         </div>
 
@@ -225,10 +225,10 @@ export function CompleteRoutineModal({
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows={4}
-              placeholder="How did the routine feel? Any insights, challenges, or thoughts to remember..."
+              placeholder="How did the ritual feel? Any insights, challenges, or thoughts to remember..."
             />
             <p className="text-xs text-gray-500 mt-1">
-              This will create a journal entry tagged with "Routine", "{routine.category}", and "{routine.name}"
+              This will create a journal entry tagged with "Ritual", "{routine.category}", and "{routine.name}"
             </p>
           </div>
 
@@ -239,7 +239,7 @@ export function CompleteRoutineModal({
               disabled={isSubmitting}
               className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
             >
-              {isSubmitting ? 'Completing...' : '🏁 Complete Routine'}
+              {isSubmitting ? 'Completing...' : '🏁 Complete Ritual'}
             </Button>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel

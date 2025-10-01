@@ -38,12 +38,12 @@ export default function RoutinesTab() {
             {/* My Routines Grid */}
             <div>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">My Routines</h2>
+                <h2 className="text-xl font-semibold text-gray-900">My Rituals</h2>
                 <button
                   onClick={() => setShowCreateModal(true)}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Create Routine
+                  Create Ritual
                 </button>
               </div>
 
@@ -66,9 +66,9 @@ export default function RoutinesTab() {
               ) : (
                 <div className="text-center py-12">
                   <div className="text-gray-400 text-6xl mb-4">🔄</div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No routines yet</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No rituals yet</h3>
                   <p className="text-gray-600 mb-4">
-                    Create your first routine or start with a template
+                    Create your first ritual or start with a template
                   </p>
                   <button
                     onClick={() => setActiveTab('templates')}
@@ -146,7 +146,7 @@ export default function RoutinesTab() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">🔄 Routines</h1>
+          <h1 className="text-3xl font-bold text-gray-900">🔄 Rituals</h1>
           <p className="text-gray-600 mt-2">
             Guided flows for morning, evening, and custom routines
           </p>
@@ -156,7 +156,7 @@ export default function RoutinesTab() {
         <div className="border-b border-gray-200 mb-6">
           <nav className="-mb-px flex space-x-8">
             {[
-              { id: 'my-routines', label: 'My Routines', icon: '🔄' },
+              { id: 'my-routines', label: 'My Rituals', icon: '🔄' },
               { id: 'templates', label: 'Templates', icon: '📋' },
               { id: 'insights', label: 'Insights', icon: '📊' }
             ].map((tab) => (

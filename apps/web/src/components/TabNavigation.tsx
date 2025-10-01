@@ -37,10 +37,10 @@ const tabs: Tab[] = [
   },
   {
     id: 'routines',
-    name: 'Routines',
+    name: 'Rituals',
     icon: ArrowPathIcon,
-    ariaLabel: 'Routines - Manage your daily routines',
-    description: 'Create and follow guided daily routines'
+    ariaLabel: 'Rituals - Manage your daily rituals',
+    description: 'Create and follow guided daily rituals'
   },
   {
     id: 'beliefs',

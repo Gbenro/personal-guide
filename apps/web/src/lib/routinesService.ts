@@ -398,11 +398,6 @@ export class RoutinesService {
     RoutineStorage.addRoutineSession(userId, newSession)
 
     console.log('✅ [ENHANCED STUB] Started routine session:', newSession)
-
-    // Additional debug logging
-    const savedSessions = RoutineStorage.getRoutineSessions(userId)
-    console.log('All sessions after creation:', savedSessions)
-
     return newSession
   }
 
@@ -414,15 +409,11 @@ export class RoutinesService {
     }
 
     const sessions = RoutineStorage.getRoutineSessions(userId)
-    console.log('All sessions for user:', sessions)
-
     const activeSession = sessions.find(s =>
       s.routine_id === routineId &&
       (s.status === 'active' || s.status === 'paused')
     )
 
-    console.log('Looking for routine:', routineId)
-    console.log('Sessions matching routine:', sessions.filter(s => s.routine_id === routineId))
     console.log('Found active session:', activeSession ? activeSession.id : 'none')
     return activeSession || null
   }
@@ -493,7 +484,7 @@ export class RoutinesService {
       focus_level: input.focus_level,
       rating: input.rating,
       notes: input.notes,
-      tags: input.tags || ['Routine'],
+      tags: input.tags || ['Ritual'],
       location: input.location,
       weather: input.weather,
       interruptions_count: input.interruptions_count || 0,
@@ -554,13 +545,13 @@ export class RoutinesService {
         if (input.rating) journalContent += `• **Rating:** ${input.rating}/5 stars\n`
         if (input.interruptions_count) journalContent += `• **Interruptions:** ${input.interruptions_count}\n`
 
-        const journalTags = ['Routine', routine.category, routine.name]
+        const journalTags = ['Ritual', routine.category, routine.name]
         if (input.tags) {
           journalTags.push(...input.tags.filter(tag => !journalTags.includes(tag)))
         }
 
         await createJournalEntry(userId, {
-          title: `${routine.name} Routine Complete`,
+          title: `${routine.name} Ritual Complete`,
           content: journalContent,
           mood_rating: input.mood_after,
           tags: journalTags
