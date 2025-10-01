@@ -52,12 +52,20 @@ export default function BeliefsTab() {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold text-gray-900">My Belief Cycles</h2>
-                <button
-                  onClick={() => setActiveTab('systems')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Start New Cycle
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-blue-700 transition-all"
+                  >
+                    ✨ Create New
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('systems')}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Browse Systems
+                  </button>
+                </div>
               </div>
 
               {cyclesLoading ? (
@@ -83,12 +91,20 @@ export default function BeliefsTab() {
                   <p className="text-gray-600 mb-4">
                     Start your first 21-day belief installation cycle
                   </p>
-                  <button
-                    onClick={() => setActiveTab('systems')}
-                    className="text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    Browse Belief Systems
-                  </button>
+                  <div className="flex justify-center gap-3">
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-2 rounded-lg hover:from-green-600 hover:to-blue-700 transition-all font-medium"
+                    >
+                      ✨ Create New Belief
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('systems')}
+                      className="text-blue-600 hover:text-blue-700 font-medium px-6 py-2 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors"
+                    >
+                      Browse Systems
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -98,11 +114,19 @@ export default function BeliefsTab() {
       case 'systems':
         return (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Belief Systems</h2>
-              <p className="text-gray-600 mb-6">
-                Choose a belief system to start your 21-day transformation cycle
-              </p>
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">Belief Systems</h2>
+                <p className="text-gray-600 mb-6">
+                  Choose a belief system to start your 21-day transformation cycle
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-blue-700 transition-all"
+              >
+                ✨ Create Custom
+              </button>
             </div>
 
             {systemsLoading ? (
@@ -196,7 +220,11 @@ export default function BeliefsTab() {
         {showCreateModal && (
           <CreateBeliefCycleModal
             onClose={() => setShowCreateModal(false)}
-            onCreated={() => setShowCreateModal(false)}
+            onCreated={() => {
+              setShowCreateModal(false)
+              // Optionally switch to my-cycles tab to show the new creation
+              setActiveTab('my-cycles')
+            }}
           />
         )}
       </div>
