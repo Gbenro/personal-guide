@@ -6,6 +6,7 @@ class RoutineStorage {
   private static ROUTINES_KEY = 'pg_user_routines'
   private static TEMPLATES_KEY = 'pg_routine_templates'
   private static SESSIONS_KEY = 'pg_routine_sessions'
+  private static COMPLETIONS_KEY = 'pg_routine_completions'
 
   static getUserRoutines(userId: string): UserRoutine[] {
     try {
@@ -56,6 +57,85 @@ class RoutineStorage {
     const existingRoutines = this.getUserRoutines(userId)
     const updatedRoutines = existingRoutines.filter(r => r.id !== routineId)
     this.saveUserRoutines(userId, updatedRoutines)
+  }
+
+  // Session management
+  static getRoutineSessions(userId: string): RoutineSession[] {
+    try {
+      const sessions = localStorage.getItem(`${this.SESSIONS_KEY}_${userId}`)
+      return sessions ? JSON.parse(sessions).map((session: any) => ({
+        ...session,
+        started_at: new Date(session.started_at),
+        updated_at: new Date(session.updated_at),
+        current_step_started_at: session.current_step_started_at ? new Date(session.current_step_started_at) : undefined
+      })) : []
+    } catch (error) {
+      console.warn('Failed to load routine sessions from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveRoutineSessions(userId: string, sessions: RoutineSession[]): void {
+    try {
+      localStorage.setItem(`${this.SESSIONS_KEY}_${userId}`, JSON.stringify(sessions))
+    } catch (error) {
+      console.warn('Failed to save routine sessions to localStorage:', error)
+    }
+  }
+
+  static addRoutineSession(userId: string, session: RoutineSession): void {
+    const existing = this.getRoutineSessions(userId)
+    const updated = [...existing, session]
+    this.saveRoutineSessions(userId, updated)
+  }
+
+  static updateRoutineSession(userId: string, sessionId: string, updates: Partial<RoutineSession>): RoutineSession | null {
+    const sessions = this.getRoutineSessions(userId)
+    const index = sessions.findIndex(s => s.id === sessionId)
+    if (index === -1) return null
+
+    sessions[index] = { ...sessions[index], ...updates, updated_at: new Date() }
+    this.saveRoutineSessions(userId, sessions)
+    return sessions[index]
+  }
+
+  // Completion management
+  static getRoutineCompletions(userId: string): RoutineCompletion[] {
+    try {
+      const completions = localStorage.getItem(`${this.COMPLETIONS_KEY}_${userId}`)
+      return completions ? JSON.parse(completions).map((completion: any) => ({
+        ...completion,
+        started_at: new Date(completion.started_at),
+        completed_at: completion.completed_at ? new Date(completion.completed_at) : undefined,
+        date: new Date(completion.date),
+        created_at: new Date(completion.created_at),
+        steps_completed: completion.steps_completed?.map((step: any) => ({
+          ...step,
+          completed_at: new Date(step.completed_at)
+        })) || [],
+        steps_skipped: completion.steps_skipped?.map((step: any) => ({
+          ...step,
+          skipped_at: new Date(step.skipped_at)
+        })) || []
+      })) : []
+    } catch (error) {
+      console.warn('Failed to load routine completions from localStorage:', error)
+      return []
+    }
+  }
+
+  static saveRoutineCompletions(userId: string, completions: RoutineCompletion[]): void {
+    try {
+      localStorage.setItem(`${this.COMPLETIONS_KEY}_${userId}`, JSON.stringify(completions))
+    } catch (error) {
+      console.warn('Failed to save routine completions to localStorage:', error)
+    }
+  }
+
+  static addRoutineCompletion(userId: string, completion: RoutineCompletion): void {
+    const existing = this.getRoutineCompletions(userId)
+    const updated = [...existing, completion]
+    this.saveRoutineCompletions(userId, updated)
   }
 }
 
@@ -284,18 +364,75 @@ export class RoutinesService {
   // ============================================================================
 
   static async startRoutineSession(userId: string, input: StartRoutineSessionInput): Promise<RoutineSession> {
-    console.log('Start routine session stub called - not implemented yet')
-    throw new Error('Start routine session not yet implemented')
+    console.log('🔥 [ENHANCED STUB] startRoutineSession called with:', { userId, input })
+
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot start routine session on server-side')
+    }
+
+    // Get the routine to initialize session
+    const routine = await this.getUserRoutine(userId, input.routine_id)
+    if (!routine) {
+      throw new Error('Routine not found')
+    }
+
+    // Create new session
+    const newSession: RoutineSession = {
+      id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      user_id: userId,
+      routine_id: input.routine_id,
+      status: 'active',
+      current_step_index: 0,
+      current_step_started_at: new Date(),
+      total_steps: routine.steps.length,
+      completed_steps: 0,
+      elapsed_time: 0,
+      session_data: input.session_data || {},
+      pause_count: 0,
+      total_pause_time: 0,
+      started_at: new Date(),
+      updated_at: new Date()
+    }
+
+    // Save session
+    RoutineStorage.addRoutineSession(userId, newSession)
+
+    console.log('✅ [ENHANCED STUB] Started routine session:', newSession)
+    return newSession
   }
 
   static async getActiveSession(userId: string, routineId: string): Promise<RoutineSession | null> {
-    console.log('Get active session stub called - returning null')
-    return null
+    console.log('🔥 [ENHANCED STUB] getActiveSession called with:', { userId, routineId })
+
+    if (typeof window === 'undefined') {
+      return null
+    }
+
+    const sessions = RoutineStorage.getRoutineSessions(userId)
+    const activeSession = sessions.find(s =>
+      s.routine_id === routineId &&
+      (s.status === 'active' || s.status === 'paused')
+    )
+
+    console.log('Found active session:', activeSession ? activeSession.id : 'none')
+    return activeSession || null
   }
 
   static async updateSessionProgress(userId: string, sessionId: string, updates: Partial<RoutineSession>): Promise<RoutineSession> {
-    console.log('Update session progress stub called - not implemented yet')
-    throw new Error('Update session progress not yet implemented')
+    console.log('🔥 [ENHANCED STUB] updateSessionProgress called with:', { userId, sessionId, updates })
+
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot update session progress on server-side')
+    }
+
+    const updatedSession = RoutineStorage.updateRoutineSession(userId, sessionId, updates)
+
+    if (!updatedSession) {
+      throw new Error('Session not found')
+    }
+
+    console.log('✅ [ENHANCED STUB] Updated session progress:', updatedSession)
+    return updatedSession
   }
 
   static async completeRoutineStep(userId: string, input: CompleteRoutineStepInput): Promise<void> {
@@ -307,8 +444,128 @@ export class RoutinesService {
   }
 
   static async completeRoutineSession(userId: string, input: CompleteRoutineSessionInput): Promise<RoutineCompletion> {
-    console.log('Complete routine session stub called - not implemented yet')
-    throw new Error('Complete routine session not yet implemented')
+    console.log('🔥 [ENHANCED STUB] completeRoutineSession called with:', { userId, input })
+
+    if (typeof window === 'undefined') {
+      throw new Error('Cannot complete routine session on server-side')
+    }
+
+    // Get the session
+    const sessions = RoutineStorage.getRoutineSessions(userId)
+    const session = sessions.find(s => s.id === input.session_id)
+    if (!session) {
+      throw new Error('Session not found')
+    }
+
+    // Get the routine
+    const routine = await this.getUserRoutine(userId, session.routine_id)
+    if (!routine) {
+      throw new Error('Routine not found')
+    }
+
+    const now = new Date()
+    const completionPercentage = Math.round((session.completed_steps / session.total_steps) * 100)
+
+    // Create completion record
+    const completion: RoutineCompletion = {
+      id: `completion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      user_id: userId,
+      routine_id: session.routine_id,
+      started_at: session.started_at,
+      completed_at: now,
+      duration_minutes: Math.round((now.getTime() - session.started_at.getTime()) / (1000 * 60)),
+      completion_percentage: completionPercentage,
+      steps_completed: input.steps_completed || [],
+      steps_skipped: input.steps_skipped || [],
+      mood_before: input.mood_before,
+      mood_after: input.mood_after,
+      energy_before: input.energy_before,
+      energy_after: input.energy_after,
+      focus_level: input.focus_level,
+      rating: input.rating,
+      notes: input.notes,
+      tags: input.tags || ['Routine'],
+      location: input.location,
+      weather: input.weather,
+      interruptions_count: input.interruptions_count || 0,
+      date: now,
+      created_at: now
+    }
+
+    // Save completion
+    RoutineStorage.addRoutineCompletion(userId, completion)
+
+    // Update session status
+    RoutineStorage.updateRoutineSession(userId, input.session_id, {
+      status: 'completed',
+      completion_id: completion.id
+    })
+
+    // Update routine stats
+    const updatedStats = {
+      total_completions: routine.total_completions + 1,
+      last_completed_at: now
+    }
+
+    // Calculate actual completion time vs estimated
+    if (completion.duration_minutes) {
+      const avgTime = routine.average_completion_time || routine.estimated_duration
+      updatedStats.average_completion_time = Math.round(
+        ((avgTime * routine.total_completions) + completion.duration_minutes) / (routine.total_completions + 1)
+      )
+    }
+
+    RoutineStorage.updateUserRoutine(userId, session.routine_id, updatedStats)
+
+    // Create journal entry if notes provided
+    if (input.notes || input.mood_before || input.mood_after) {
+      try {
+        const { createJournalEntry } = await import('./journalService')
+
+        let journalContent = ''
+
+        if (input.notes) {
+          journalContent += `**Routine Notes:**\n${input.notes}\n\n`
+        }
+
+        if (input.mood_before || input.mood_after || input.energy_before || input.energy_after) {
+          journalContent += `**Routine Experience:**\n`
+          if (input.mood_before) journalContent += `• Mood before: ${input.mood_before}/10\n`
+          if (input.mood_after) journalContent += `• Mood after: ${input.mood_after}/10\n`
+          if (input.energy_before) journalContent += `• Energy before: ${input.energy_before}/10\n`
+          if (input.energy_after) journalContent += `• Energy after: ${input.energy_after}/10\n`
+          if (input.focus_level) journalContent += `• Focus level: ${input.focus_level}/10\n`
+          journalContent += '\n'
+        }
+
+        journalContent += `**Routine Details:**\n`
+        journalContent += `• **Routine:** ${routine.name}\n`
+        journalContent += `• **Duration:** ${completion.duration_minutes} minutes\n`
+        journalContent += `• **Completion:** ${completionPercentage}%\n`
+        if (input.rating) journalContent += `• **Rating:** ${input.rating}/5 stars\n`
+        if (input.interruptions_count) journalContent += `• **Interruptions:** ${input.interruptions_count}\n`
+
+        const journalTags = ['Routine', routine.category, routine.name]
+        if (input.tags) {
+          journalTags.push(...input.tags.filter(tag => !journalTags.includes(tag)))
+        }
+
+        await createJournalEntry(userId, {
+          title: `${routine.name} Routine Complete`,
+          content: journalContent,
+          mood_rating: input.mood_after,
+          tags: journalTags
+        })
+
+        console.log('✅ [ENHANCED STUB] Created journal entry for routine completion')
+      } catch (error) {
+        console.error('Failed to create journal entry:', error)
+        // Don't fail the routine completion if journal fails
+      }
+    }
+
+    console.log('✅ [ENHANCED STUB] Completed routine session:', completion)
+    return completion
   }
 
   static async pauseSession(userId: string, sessionId: string): Promise<RoutineSession> {

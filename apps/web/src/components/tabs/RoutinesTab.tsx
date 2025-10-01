@@ -59,7 +59,6 @@ export default function RoutinesTab() {
                     <RoutineCard
                       key={routine.id}
                       routine={routine}
-                      onStart={() => {/* TODO: Handle start */}}
                       onEdit={() => {/* TODO: Handle edit */}}
                     />
                   ))}

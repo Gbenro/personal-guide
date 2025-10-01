@@ -1,14 +1,18 @@
+import { useState } from 'react'
 import { UserRoutine } from '../../types/routines'
-import { useRoutineActions } from '../../hooks/useRoutines'
+import { useRoutineActions, useActiveSession, useCompleteRoutineSession } from '../../hooks/useRoutines'
+import { CompleteRoutineModal } from './CompleteRoutineModal'
 
 interface RoutineCardProps {
   routine: UserRoutine
-  onStart: () => void
   onEdit: () => void
 }
 
-export function RoutineCard({ routine, onStart, onEdit }: RoutineCardProps) {
-  const { toggleFavorite, toggleActive, isLoading } = useRoutineActions(routine.id)
+export function RoutineCard({ routine, onEdit }: RoutineCardProps) {
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const { toggleFavorite, toggleActive, startRoutine, isLoading } = useRoutineActions(routine.id)
+  const { data: activeSession } = useActiveSession(routine.id)
+  const completeSessionMutation = useCompleteRoutineSession()
 
   const getCategoryColor = (category: string) => {
     const colors = {
@@ -37,6 +41,22 @@ export function RoutineCard({ routine, onStart, onEdit }: RoutineCardProps) {
     }
     return icons[category as keyof typeof icons] || icons.General
   }
+
+  const handleStartRoutine = () => {
+    startRoutine()
+  }
+
+  const handleCompleteRoutine = async (input: any) => {
+    await completeSessionMutation.mutateAsync(input)
+    setShowCompleteModal(false)
+  }
+
+  const getSessionDuration = () => {
+    if (!activeSession) return 0
+    return Math.round((Date.now() - activeSession.started_at.getTime()) / (1000 * 60))
+  }
+
+  const isRoutineActive = !!activeSession && activeSession.status === 'active'
 
   return (
     <div className={`bg-white rounded-lg border ${!routine.is_active ? 'opacity-60' : ''} hover:shadow-md transition-shadow`}>
@@ -126,29 +146,45 @@ export function RoutineCard({ routine, onStart, onEdit }: RoutineCardProps) {
 
         {/* Actions */}
         <div className="flex space-x-2">
-          <button
-            onClick={onStart}
-            disabled={!routine.is_active}
-            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-              routine.is_active
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            Start Routine
-          </button>
+          {isRoutineActive ? (
+            <>
+              <button
+                onClick={() => setShowCompleteModal(true)}
+                className="flex-1 py-2 px-3 rounded-lg text-sm font-medium bg-gradient-to-r from-green-500 to-blue-600 text-white hover:from-green-600 hover:to-blue-700 transition-all"
+              >
+                🏁 Complete ({getSessionDuration()}m)
+              </button>
+              <div className="px-2 py-2 bg-green-50 rounded-lg flex items-center">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              </div>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleStartRoutine}
+                disabled={!routine.is_active || isLoading}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  routine.is_active && !isLoading
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isLoading ? 'Starting...' : '▶️ Start Routine'}
+              </button>
 
-          <button
-            onClick={() => toggleActive(routine)}
-            disabled={isLoading}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              routine.is_active
-                ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                : 'bg-green-100 text-green-600 hover:bg-green-200'
-            }`}
-          >
-            {routine.is_active ? 'Pause' : 'Resume'}
-          </button>
+              <button
+                onClick={() => toggleActive(routine)}
+                disabled={isLoading}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  routine.is_active
+                    ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-green-100 text-green-600 hover:bg-green-200'
+                }`}
+              >
+                {routine.is_active ? 'Pause' : 'Resume'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -159,6 +195,18 @@ export function RoutineCard({ routine, onStart, onEdit }: RoutineCardProps) {
             Last completed {new Date(routine.last_completed_at).toLocaleDateString()}
           </div>
         </div>
+      )}
+
+      {/* Complete Routine Modal */}
+      {showCompleteModal && activeSession && (
+        <CompleteRoutineModal
+          open={showCompleteModal}
+          onClose={() => setShowCompleteModal(false)}
+          onComplete={handleCompleteRoutine}
+          routine={routine}
+          session={activeSession}
+          actualDurationMinutes={getSessionDuration()}
+        />
       )}
     </div>
   )
