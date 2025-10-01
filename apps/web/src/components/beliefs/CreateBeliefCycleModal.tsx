@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useCreateBeliefSystem, useCreateBeliefCycle, useBeliefSystems } from '@/hooks/useBeliefs'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '@/contexts/AuthContext'
 import type { CreateBeliefSystemInput, CreateBeliefCycleInput, BeliefCategory } from '@/types/beliefs'
 import { Button } from '@/components/ui/button'
 
