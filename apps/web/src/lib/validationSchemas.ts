@@ -120,7 +120,7 @@ export const moodEntrySchema = z.object({
   notes: z.string()
     .max(500, 'Notes must be less than 500 characters')
     .optional(),
-  journal_entry_id: z.string().uuid().optional()
+  journal_entry_id: z.string().optional()
 })
 
 // =============================================================================

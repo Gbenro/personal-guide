@@ -223,6 +223,9 @@ function buildContextualSystemPrompt(
           case 'friend':
             contextualAddition = `\n\nThe user is feeling good (confidence: ${Math.round(moodData.confidence * 100)}%)! Share genuinely in their joy and celebrate with them while being authentically happy for their positive state.`
             break
+          case 'mirror':
+            contextualAddition = `\n\nThe user radiates positive energy (confidence: ${Math.round(moodData.confidence * 100)}%). Reflect this brightness back to them clearly, allowing them to see their own light without adding or subtracting from it.`
+            break
         }
         break
 
@@ -237,17 +240,24 @@ function buildContextualSystemPrompt(
           case 'friend':
             contextualAddition = `\n\nThe user needs emotional support (confidence: ${Math.round(moodData.confidence * 100)}%). Focus on listening, validating their feelings, and offering comfort without trying to immediately fix their problems.`
             break
+          case 'mirror':
+            contextualAddition = `\n\nThe user carries heavy emotional weight (confidence: ${Math.round(moodData.confidence * 100)}%). Mirror their struggle without trying to lift or transform it - simply reflect what is present so they can see themselves clearly in this difficult moment.`
+            break
         }
         break
 
       case 'goal-focused':
-        if (personalityMode !== 'coach') {
+        if (personalityMode === 'mirror') {
+          contextualAddition = `\n\nThe user shows clear focus on goals and achievement (confidence: ${Math.round(moodData.confidence * 100)}%). Reflect their determination and drive back to them without adding advice or direction - let them see their own focused energy.`
+        } else if (personalityMode !== 'coach') {
           contextualAddition = `\n\nThe user is highly focused on goals and achievement (confidence: ${Math.round(moodData.confidence * 100)}%). Consider how your ${personalityMode} personality can support their goal-oriented mindset.`
         }
         break
 
       case 'reflective':
-        if (personalityMode !== 'mentor') {
+        if (personalityMode === 'mirror') {
+          contextualAddition = `\n\nThe user seeks deep reflection and understanding (confidence: ${Math.round(moodData.confidence * 100)}%). Be a clear mirror for their contemplative energy, reflecting their thoughts back without interpretation or guidance.`
+        } else if (personalityMode !== 'mentor') {
           contextualAddition = `\n\nThe user is in a deeply reflective mood (confidence: ${Math.round(moodData.confidence * 100)}%). Consider how your ${personalityMode} personality can support their desire for deeper understanding and introspection.`
         }
         break
@@ -451,7 +461,7 @@ export async function GET() {
   return NextResponse.json({
     availableProviders,
     defaultProvider: availableProviders[0] || null,
-    personalities: ['mentor', 'coach', 'friend'],
+    personalities: ['mentor', 'coach', 'friend', 'mirror'],
     personalityDetails: {
       mentor: {
         name: 'Mentor',
@@ -467,6 +477,11 @@ export async function GET() {
         name: 'Friend',
         icon: '🤝',
         description: 'Supportive listening and comfort'
+      },
+      mirror: {
+        name: 'Mirror',
+        icon: '🪞',
+        description: 'Pure reflection and self-awareness'
       }
     },
     moodDetection: {

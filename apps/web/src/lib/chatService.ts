@@ -22,7 +22,7 @@ export interface ChatMessage {
   mood?: string
   mood_confidence?: number
   emotional_keywords?: string[]
-  personality_mode?: 'mentor' | 'coach' | 'friend'
+  personality_mode?: 'mentor' | 'coach' | 'friend' | 'mirror'
   ai_provider?: string
   created_at: string
   updated_at: string
@@ -92,7 +92,7 @@ export async function saveMessage(
     mood?: string
     mood_confidence?: number
     emotional_keywords?: string[]
-    personality_mode?: 'mentor' | 'coach' | 'friend'
+    personality_mode?: 'mentor' | 'coach' | 'friend' | 'mirror'
     ai_provider?: string
   }
 ): Promise<ChatMessage | null> {
